@@ -35,7 +35,7 @@ func (r *Review) GetGitGroupAndName() (string, string) {
 }
 
 // ListReviews lists reviews in Upsource that match the given query.
-func ListReviews(ctx context.Context, upsourceClient *client.Client, query string) ([]*Review, error) {
+func ListReviews(ctx context.Context, upsourceClient *client.Client, query string, reviewedLabel string) ([]*Review, error) {
 	upsourceReviews, err := upsourceClient.GetReviews(ctx, client.ReviewsRequestDTO{
 		Limit: 10000,
 		Query: query,
@@ -49,6 +49,19 @@ func ListReviews(ctx context.Context, upsourceClient *client.Client, query strin
 	for _, review := range upsourceReviews.Reviews {
 		if len(review.Branch) == 0 {
 			log.Printf("Skipping review %s because it has no branch\n", review.Title)
+			continue
+		}
+
+		var skip bool
+		for _, label := range review.Labels {
+			if label.Name == reviewedLabel {
+				log.Printf("Skipping review %s already AI-reviewed.\n", review.Title)
+				skip = true
+				break
+			}
+		}
+
+		if skip {
 			continue
 		}
 

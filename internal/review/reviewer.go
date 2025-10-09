@@ -100,7 +100,7 @@ func (r *Reviewer) doReview(review *upsource.Review) ([]*llm.ReviewComment, erro
 
 // listReviews fetches reviews from Upsource based on the configured query.
 func (r *Reviewer) listReviews() ([]*upsource.Review, error) {
-	reviews, err := upsource.ListReviews(r.ctx, r.upsourceClient, r.config.Upsource.Query)
+	reviews, err := upsource.ListReviews(r.ctx, r.upsourceClient, r.config.Upsource.Query, r.config.Upsource.ReviewedLabel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list reviews: %w", err)
 	}
