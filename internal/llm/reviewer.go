@@ -51,7 +51,6 @@ func (c *Reviewer) Do(changes string, comments string) ([]*ReviewComment, error)
 
 // processAndPostLLMResponse processes the LLM response and returns the review comments.
 func processAndPostLLMResponse(llmResponse string) ([]*ReviewComment, error) {
-	log.Printf("Received LLM response: %s\n", llmResponse)
 	// Try to extract JSON from the assistant content
 	llmResponse = parseLLMDecision(llmResponse)
 
