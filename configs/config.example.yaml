@@ -1,6 +1,6 @@
 comments:
   maxPerReview: 10
-  highSeveritySplit: true
+  postInLine: high # Post comments inline for selected severity issues. Options: high, mid, low, none
 upsource:
   baseUrl: "https://upsource.example.com"
   username: "your-username"

@@ -59,6 +59,7 @@ func (r *Reviewer) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to list reviews: %w", err)
 	}
+	log.Printf("Found %d reviews to process.\n", len(reviews))
 
 	var comments []*llm.ReviewComment
 	for _, review := range reviews {
@@ -81,6 +82,8 @@ func (r *Reviewer) Run() error {
 }
 
 func (r *Reviewer) doReview(review *upsource.Review) ([]*llm.ReviewComment, error) {
+	log.Printf("Processing review for the branch %s.\n", review.GetBranch())
+
 	changes, commits, err := r.gitProvider.GetReviewChanges(review)
 	if err != nil {
 		return nil, fmt.Errorf("Error getting review changes for %s: %w\n", review.GetBranch(), err)
@@ -110,35 +113,38 @@ func (r *Reviewer) listReviews() ([]*upsource.Review, error) {
 
 // postComments posts review comments to Upsource, splitting high severity comments into separate discussions if configured.
 func (r *Reviewer) postComments(review *upsource.Review, comments []*llm.ReviewComment) error {
-	if r.config.Comments.HighSeveritySplit {
-		var lowPriorityComments []*llm.ReviewComment
-		for _, comment := range comments {
-			if comment.Severity == llm.SeverityHigh {
-				err := upsource.CreateDiscussion(r.ctx, r.upsourceClient, r.config, upsource.CreateDiscussionRequest{
-					Review:  review,
-					Comment: comment.Comment,
-					File:    comment.FilePath,
-					Line:    comment.LineNumber,
-				})
-				if err != nil {
-					return fmt.Errorf("failed to post high priority comment to %s:%d -> %s: %w", comment.FilePath, comment.LineNumber, comment.Comment, err)
-				}
-			} else {
-				lowPriorityComments = append(lowPriorityComments, comment)
-			}
-		}
+	var postInOneComments []*llm.ReviewComment
+	var inlineComments []*llm.ReviewComment
 
-		if len(lowPriorityComments) > 0 {
-			if err := r.createOneDiscussion(lowPriorityComments, review); err != nil {
-				return fmt.Errorf("failed to post low priority comments to review %s: %w", review.GetBranch(), err)
-			}
+	for _, comment := range comments {
+		switch {
+		case comment.Severity == llm.SeverityHigh && r.config.Comments.PostInLine == "high":
+			inlineComments = append(inlineComments, comment)
+		case (comment.Severity == llm.SeverityMedium || comment.Severity == llm.SeverityHigh) && r.config.Comments.PostInLine == "mid":
+			inlineComments = append(inlineComments, comment)
+		case r.config.Comments.PostInLine == "low":
+			inlineComments = append(inlineComments, comment)
+		default:
+			postInOneComments = append(postInOneComments, comment)
 		}
-
-		return nil
 	}
 
-	if err := r.createOneDiscussion(comments, review); err != nil {
-		return fmt.Errorf("failed to post comments to review %s: %w", review.GetBranch(), err)
+	for _, comment := range inlineComments {
+		err := upsource.CreateDiscussion(r.ctx, r.upsourceClient, r.config, upsource.CreateDiscussionRequest{
+			Review:  review,
+			Comment: comment.Comment,
+			File:    comment.FilePath,
+			Line:    comment.LineNumber,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to post inline comment to %s:%d -> %s: %w", comment.FilePath, comment.LineNumber, comment.Comment, err)
+		}
+	}
+
+	if len(postInOneComments) > 0 {
+		if err := r.createOneDiscussion(postInOneComments, review); err != nil {
+			return fmt.Errorf("failed to post comments to review %s: %w", review.GetBranch(), err)
+		}
 	}
 
 	return nil

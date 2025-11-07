@@ -2,3 +2,4 @@
 .vscode/
 vendor/
 /config.yaml
+/upsource_ai_reviewer

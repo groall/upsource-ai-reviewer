@@ -19,8 +19,8 @@ type Config struct {
 }
 
 type Comments struct {
-	MaxPerReview      int  `yaml:"maxPerReview"`
-	HighSeveritySplit bool `yaml:"highSeveritySplit"`
+	MaxPerReview int    `yaml:"maxPerReview"`
+	PostInLine   string `yaml:"postInLine"` // high, mid, low, none
 }
 
 type Gemini struct {
@@ -110,6 +110,15 @@ func ValidateConfig(config *Config) error {
 	}
 	if config.Polling.IntervalSeconds == 0 {
 		return fmt.Errorf("polling.intervalSeconds is required")
+	}
+	if config.Comments.MaxPerReview == 0 {
+		return fmt.Errorf("comments.maxPerReview is required")
+	}
+	if config.Comments.PostInLine == "" {
+		return fmt.Errorf("comments.postInLine is required")
+	}
+	if config.Comments.PostInLine != "high" && config.Comments.PostInLine != "mid" && config.Comments.PostInLine != "low" && config.Comments.PostInLine != "none" {
+		return fmt.Errorf("comments.postInLine must be one of: high, mid, low, none")
 	}
 
 	return nil

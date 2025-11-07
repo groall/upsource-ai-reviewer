@@ -39,6 +39,8 @@ func (c *Reviewer) Do(changes string, comments string) ([]*ReviewComment, error)
 
 	systemMessage := fmt.Sprintf(c.config.Promts.SystemMessage, c.config.Comments.MaxPerReview)
 
+	log.Print("Sending prompt to LLM...")
+
 	llmResponse, err := c.llmProvider.Completion(prompt, systemMessage)
 	if err != nil {
 		return nil, fmt.Errorf("LLM request failed: %w", err)
