@@ -3,7 +3,7 @@ package git
 type Review interface {
 	GetDefaultBranch() string
 	GetBranch() string
-	GetGitGroupAndName() (string, string)
+	GetGitNamespaceAndName() (string, string)
 }
 
 type Provider interface {

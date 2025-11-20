@@ -29,7 +29,7 @@ func (m *MockReview) GetBranch() string {
 	return args.String(0)
 }
 
-func (m *MockReview) GetGitGroupAndName() (string, string) {
+func (m *MockReview) GetGitNamespaceAndName() (string, string) {
 	args := m.Called()
 	return args.String(0), args.String(1)
 }
@@ -80,7 +80,7 @@ func TestGetReviewChanges(t *testing.T) {
 	review := new(MockReview)
 	review.On("GetDefaultBranch").Return("main")
 	review.On("GetBranch").Return("feature")
-	review.On("GetGitGroupAndName").Return("group", "repo")
+	review.On("GetGitNamespaceAndName").Return("group", "repo")
 
 	changes, comments, err := provider.GetReviewChanges(review)
 	assert.NoError(t, err)
@@ -110,7 +110,7 @@ func TestGetReviewChanges_NoDiffs(t *testing.T) {
 	review := new(MockReview)
 	review.On("GetDefaultBranch").Return("main")
 	review.On("GetBranch").Return("feature")
-	review.On("GetGitGroupAndName").Return("group", "repo")
+	review.On("GetGitNamespaceAndName").Return("group", "repo")
 
 	_, _, err = provider.GetReviewChanges(review)
 	assert.Error(t, err)

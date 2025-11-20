@@ -30,13 +30,29 @@ func NewGitlabProvider(cfg *config.Config) (*GitlabProvider, error) {
 func (g *GitlabProvider) GetReviewChanges(review Review) (string, string, error) {
 	fmt.Printf("Fetching changes between branch '%s' and '%s'\n", review.GetDefaultBranch(), review.GetBranch())
 
-	defaultBranch, branch := review.GetDefaultBranch(), review.GetBranch()
+	branch := review.GetBranch()
 	compareOpts := &gitlab.CompareOptions{
-		From: &defaultBranch,
-		To:   &branch,
+		To: &branch,
 	}
-	groupPath, repoName := review.GetGitGroupAndName()
-	gitlabProjectID := fmt.Sprintf("%s/%s", groupPath, repoName)
+	namespace, repoName := review.GetGitNamespaceAndName()
+	gitlabProjectID := fmt.Sprintf("%s/%s", namespace, repoName)
+
+	branches, _, err := g.gitlabClient.Branches.ListBranches(gitlabProjectID, &gitlab.ListBranchesOptions{})
+	if err != nil {
+		return "", "", fmt.Errorf("failed to list branches for project %s: %w", gitlabProjectID, err)
+	}
+
+	var defaultBranch string
+	for _, b := range branches {
+		if b.Default {
+			defaultBranch = b.Name
+			break
+		}
+	}
+	if defaultBranch == "" {
+		defaultBranch = review.GetDefaultBranch()
+	}
+	compareOpts.From = &defaultBranch
 
 	comparison, _, err := g.gitlabClient.Repositories.Compare(gitlabProjectID, compareOpts)
 	if err != nil {

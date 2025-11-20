@@ -16,7 +16,7 @@ import (
 type Review struct {
 	defaultBranch    string
 	branch           string
-	gitGroup         string
+	gitNamespace     string
 	gitName          string
 	review           *client.ReviewDescriptorDTO
 	filesDiffSummary []client.FileDiffSummaryDTO
@@ -30,8 +30,8 @@ func (r *Review) GetBranch() string {
 	return r.branch
 }
 
-func (r *Review) GetGitGroupAndName() (string, string) {
-	return r.gitGroup, r.gitName
+func (r *Review) GetGitNamespaceAndName() (string, string) {
+	return r.gitNamespace, r.gitName
 }
 
 // ListReviews lists reviews in Upsource that match the given query.
@@ -110,7 +110,7 @@ func newReviewFromUpsourceReview(ctx context.Context, upsourceReview client.Revi
 	return &Review{
 		defaultBranch:    projectInfo.DefaultBranch,
 		branch:           upsourceReview.Branch[0],
-		gitGroup:         groupPath,
+		gitNamespace:     groupPath,
 		gitName:          repoName,
 		review:           &upsourceReview,
 		filesDiffSummary: reviewSummaryChanges.FileDiffSummary,
