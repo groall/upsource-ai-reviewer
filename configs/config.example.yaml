@@ -10,6 +10,10 @@ upsource:
 gitlab:
   baseUrl: "https://gitlab.example.com"
   accessToken: "your-gitlab-access-token"
+codex:
+  command: "codex ask --quiet --input -" # Command that reads prompt from stdin and writes response to stdout
+  workdir: "" # optional working directory for the Codex command
+  requestTimeout: 300s
 openai:
   endpoint: "https://api.openai.com/v1"
   model: "gpt-4o-mini"

@@ -13,6 +13,7 @@ type Config struct {
 	Gitlab   Gitlab   `yaml:"gitlab"`
 	Promts   Promts   `yaml:"promts"`
 	OpenAI   OpenAI   `yaml:"openai"`
+	Codex    Codex    `yaml:"codex"`
 	Gemini   Gemini   `yaml:"gemini"`
 	Polling  Polling  `yaml:"polling"`
 	Comments Comments `yaml:"comments"`
@@ -53,6 +54,12 @@ type OpenAI struct {
 	MaxTokens      int           `yaml:"maxTokens"`
 	Temperature    float64       `yaml:"temperature"`
 	APIKey         string        `yaml:"apiKey"`
+	RequestTimeout time.Duration `yaml:"requestTimeout"`
+}
+
+type Codex struct {
+	Command        string        `yaml:"command"`
+	Workdir        string        `yaml:"workdir"`
 	RequestTimeout time.Duration `yaml:"requestTimeout"`
 }
 
@@ -99,9 +106,10 @@ func ValidateConfig(config *Config) error {
 	if config.Gitlab.AccessToken == "" {
 		return fmt.Errorf("gitlab.accessToken is required")
 	}
-	if config.OpenAI.APIKey == "" && config.Gemini.APIKey == "" {
-		return fmt.Errorf("either openai.apiKey or gemini.apiKey is required")
+	if config.OpenAI.APIKey == "" && config.Gemini.APIKey == "" && config.Codex.Command == "" {
+		return fmt.Errorf("either openai.apiKey, gemini.apiKey, or codex.command is required")
 	}
+	// Allow Codex without API keys; no additional validation needed beyond a command being present.
 	if config.Promts.SystemMessage == "" {
 		return fmt.Errorf("promts.systemMessage is required")
 	}

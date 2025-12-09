@@ -53,6 +53,10 @@ You can copy this file and modify it according to your needs.
 - **gitlab**: Configuration for your GitLab instance.
   - `baseUrl`: The base URL of your GitLab instance.
   - `accessToken`: Your GitLab personal access token.
+- **codex**: Configuration for running Codex locally via a shell command.
+  - `command`: Shell command that reads the prompt from stdin and prints the completion to stdout (e.g., `codex ask --quiet --input -`).
+  - `workdir`: Optional working directory in which to execute the command.
+  - `requestTimeout`: Timeout for the Codex command.
 - **openai**: Configuration for the OpenAI API.
   - `endpoint`: The OpenAI API endpoint.
   - `model`: The OpenAI model to use for generating reviews.
