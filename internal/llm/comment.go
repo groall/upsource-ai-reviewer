@@ -2,10 +2,11 @@ package llm
 
 // ReviewComment matches the JSON structure we requested from the LLM.
 type ReviewComment struct {
-	FilePath   string `json:"filePath"`   // Path to the file where the comment is made.
-	LineNumber int    `json:"lineNumber"` // Line number in the file where the comment is made.
-	Comment    string `json:"comment"`    // The actual comment text.
-	Severity   string `json:"severity"`   // Severity of the comment, can be "low", "medium", or "high".
+	FilePath     string `json:"filePath"`     // Path to the file where the comment is made.
+	LineNumber   int    `json:"lineNumber"`   // Line number in the file where the comment is made.
+	LineVerified bool   `json:"lineVerified"` // Whether the line in the file is verified or not.
+	Comment      string `json:"comment"`      // The actual comment text.
+	Severity     string `json:"severity"`     // Severity of the comment, can be "low", "medium", or "high".
 }
 
 const (

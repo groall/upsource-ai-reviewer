@@ -63,7 +63,7 @@ func (g *GitlabProvider) GetReviewChanges(review Review) (string, string, error)
 		return "", "", fmt.Errorf("No diffs found between '%s' and '%s'.\n", review.GetDefaultBranch(), review.GetBranch())
 	}
 
-	return createChangesText(comparison.Diffs), createCommentsText(comparison.Commits), nil
+	return createChangesText(comparison.Diffs), createCommitsCommentsText(comparison.Commits), nil
 }
 
 // createChangesText constructs the changes text from the GitLab comparison diffs.
@@ -86,8 +86,8 @@ func createChangesText(diffs []*gitlab.Diff) string {
 	return changesBuilder.String()
 }
 
-// createCommentsText constructs the comments text from the GitLab comparison commits.
-func createCommentsText(commits []*gitlab.Commit) string {
+// createCommitsCommentsText constructs the comments text from the GitLab comparison commits.
+func createCommitsCommentsText(commits []*gitlab.Commit) string {
 	var commentsBuilder strings.Builder
 	for _, comment := range commits {
 		commentsBuilder.WriteString(fmt.Sprintf("Commit %s:\n%s\n\n", comment.ID, comment.Message))

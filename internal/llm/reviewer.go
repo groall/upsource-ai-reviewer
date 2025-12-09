@@ -33,9 +33,9 @@ func New(ctx context.Context, cfg *config.Config) (*Reviewer, error) {
 }
 
 // Do calls OpenAI Chat Completion API to review changes.
-func (c *Reviewer) Do(changes string, comments string) ([]*ReviewComment, error) {
+func (c *Reviewer) Do(changes string, commitsComments string) ([]*ReviewComment, error) {
 	// Build a concise prompt and send to OpenAI-compatible API using SDK
-	prompt := fmt.Sprintf(c.config.Promts.UserPromptTemplate, changes, comments)
+	prompt := fmt.Sprintf(c.config.Promts.UserPromptTemplate, changes, commitsComments)
 
 	systemMessage := fmt.Sprintf(c.config.Promts.SystemMessage, c.config.Comments.MaxPerReview)
 
@@ -48,7 +48,14 @@ func (c *Reviewer) Do(changes string, comments string) ([]*ReviewComment, error)
 
 	log.Printf("Received LLM response: %s\n", llmResponse)
 
-	return processAndPostLLMResponse(llmResponse)
+	comments, err := processAndPostLLMResponse(llmResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	comments = validateCommentsAgainstDiff(changes, comments)
+
+	return comments, nil
 }
 
 // processAndPostLLMResponse processes the LLM response and returns the review comments.

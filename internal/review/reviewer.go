@@ -84,12 +84,12 @@ func (r *Reviewer) Run() error {
 func (r *Reviewer) doReview(review *upsource.Review) ([]*llm.ReviewComment, error) {
 	log.Printf("Processing review for the branch %s.\n", review.GetBranch())
 
-	changes, commits, err := r.gitProvider.GetReviewChanges(review)
+	changes, commitsComments, err := r.gitProvider.GetReviewChanges(review)
 	if err != nil {
 		return nil, fmt.Errorf("Error getting review changes for %s: %w\n", review.GetBranch(), err)
 	}
 
-	comments, err := r.llmReviewer.Do(changes, commits)
+	comments, err := r.llmReviewer.Do(changes, commitsComments)
 	if err != nil {
 		return nil, fmt.Errorf("Error getting review comments for %s: %w\n", review.GetBranch(), err)
 	}
@@ -117,12 +117,13 @@ func (r *Reviewer) postComments(review *upsource.Review, comments []*llm.ReviewC
 	var inlineComments []*llm.ReviewComment
 
 	for _, comment := range comments {
+		thereIsLine := comment.LineNumber > 0 && comment.FilePath != "" && comment.LineVerified
 		switch {
-		case comment.Severity == llm.SeverityHigh && r.config.Comments.PostInLine == "high":
+		case comment.Severity == llm.SeverityHigh && r.config.Comments.PostInLine == "high" && thereIsLine:
 			inlineComments = append(inlineComments, comment)
-		case (comment.Severity == llm.SeverityMedium || comment.Severity == llm.SeverityHigh) && r.config.Comments.PostInLine == "mid":
+		case (comment.Severity == llm.SeverityMedium || comment.Severity == llm.SeverityHigh) && r.config.Comments.PostInLine == "mid" && thereIsLine:
 			inlineComments = append(inlineComments, comment)
-		case r.config.Comments.PostInLine == "low":
+		case r.config.Comments.PostInLine == "low" && thereIsLine:
 			inlineComments = append(inlineComments, comment)
 		default:
 			postInOneComments = append(postInOneComments, comment)

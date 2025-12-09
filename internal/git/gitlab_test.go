@@ -208,5 +208,5 @@ Commit 456:
 fix: bug fix
 
 `
-	assert.Equal(t, expected, createCommentsText(commits))
+	assert.Equal(t, expected, createCommitsCommentsText(commits))
 }
