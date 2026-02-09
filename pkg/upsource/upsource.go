@@ -35,7 +35,7 @@ func (r *Review) GetGitNamespaceAndName() (string, string) {
 }
 
 // ListReviews lists reviews in Upsource that match the given query.
-func ListReviews(ctx context.Context, upsourceClient *client.Client, query string, reviewedLabel string) ([]*Review, error) {
+func ListReviews(ctx context.Context, upsourceClient *client.Client, query string, reviewedLabel string, invitationLabel string) ([]*Review, error) {
 	upsourceReviews, err := upsourceClient.GetReviews(ctx, client.ReviewsRequestDTO{
 		Limit: 10000,
 		Query: query,
@@ -55,19 +55,36 @@ func ListReviews(ctx context.Context, upsourceClient *client.Client, query strin
 		var skip bool
 		for _, label := range review.Labels {
 			if label.Name == reviewedLabel {
-				log.Printf("Skipping review %s already AI-reviewed.\n", review.Title)
 				skip = true
 				break
 			}
 		}
 
 		if skip {
+			log.Printf("Skipping review %s already AI-reviewed.\n", review.Title)
+			continue
+		}
+
+		var isInvited bool
+		if invitationLabel != "" {
+			for _, label := range review.Labels {
+				if label.Name == invitationLabel {
+					isInvited = true
+					break
+				}
+			}
+		} else {
+			isInvited = true
+		}
+
+		if !isInvited {
+			log.Printf("Skipping review %s as the AI reviewer is not invited.\n", review.Title)
 			continue
 		}
 
 		reviewTodo, err := newReviewFromUpsourceReview(ctx, review, upsourceClient)
 		if err != nil {
-			log.Printf("Skipping review %s: %v\n", review.Title, err)
+			log.Printf("Skipping review %s due to error: %v\n", review.Title, err)
 			continue
 		}
 

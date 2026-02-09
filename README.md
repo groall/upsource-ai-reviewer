@@ -50,6 +50,7 @@ You can copy this file and modify it according to your needs.
   - `password`: Your Upsource password.
   - `query`: The Upsource search query to find reviews to be processed.
   - `reviewedLabel`: The label to add to a review after it has been reviewed.
+  - `invitationLabel`: The label to check for to determine if the AI reviewer is invited. Can be empty if all reviews should be processed.
 - **gitlab**: Configuration for your GitLab instance.
   - `baseUrl`: The base URL of your GitLab instance.
   - `accessToken`: Your GitLab personal access token.

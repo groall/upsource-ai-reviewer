@@ -36,11 +36,12 @@ type Polling struct {
 }
 
 type Upsource struct {
-	BaseURL       string `yaml:"baseUrl"`
-	Username      string `yaml:"username"`
-	Password      string `yaml:"password"`
-	Query         string `yaml:"query"`
-	ReviewedLabel string `yaml:"reviewedLabel"`
+	BaseURL         string `yaml:"baseUrl"`
+	Username        string `yaml:"username"`
+	Password        string `yaml:"password"`
+	Query           string `yaml:"query"`
+	ReviewedLabel   string `yaml:"reviewedLabel"`
+	InvitationLabel string `yaml:"invitationLabel"`
 }
 
 type Gitlab struct {
