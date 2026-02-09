@@ -4,6 +4,10 @@ import (
 	"context"
 	"flag"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/groall/upsource-ai-reviewer/internal/review"
 	"github.com/groall/upsource-ai-reviewer/pkg/config"
@@ -32,11 +36,33 @@ func main() {
 		log.Fatalf("Failed to create reviewer: %v", err)
 	}
 
-	// Run the reviewer
-	log.Println("Starting AI Reviewer...")
-	err = reviewer.Run()
-	if err != nil {
-		log.Fatalf("Failed to run reviewer: %v", err)
+	// Setup signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	// Get polling interval from config
+	interval := time.Duration(appConfig.Polling.IntervalSeconds) * time.Second
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	log.Printf("Starting AI Reviewer service (polling every %v)...", interval)
+
+	// Run immediately on startup
+	if err := reviewer.Run(); err != nil {
+		log.Printf("Error during review: %v", err)
 	}
-	log.Println("AI Reviewer finished successfully.")
+
+	// Run the reviewer in a loop
+	for {
+		select {
+		case <-ticker.C:
+			log.Println("Checking for new reviews...")
+			if err := reviewer.Run(); err != nil {
+				log.Printf("Error during review: %v", err)
+			}
+		case sig := <-sigChan:
+			log.Printf("Received signal %v, shutting down gracefully...", sig)
+			return
+		}
+	}
 }
