@@ -9,14 +9,15 @@ import (
 )
 
 type Config struct {
-	Upsource Upsource `yaml:"upsource"`
-	Gitlab   Gitlab   `yaml:"gitlab"`
-	Promts   Promts   `yaml:"promts"`
-	OpenAI   OpenAI   `yaml:"openai"`
-	Codex    Codex    `yaml:"codex"`
-	Gemini   Gemini   `yaml:"gemini"`
-	Polling  Polling  `yaml:"polling"`
-	Comments Comments `yaml:"comments"`
+	Upsource  Upsource  `yaml:"upsource"`
+	Gitlab    Gitlab    `yaml:"gitlab"`
+	Promts    Promts    `yaml:"promts"`
+	OpenAI    OpenAI    `yaml:"openai"`
+	Codex     Codex     `yaml:"codex"`
+	Gemini    Gemini    `yaml:"gemini"`
+	Anthropic Anthropic `yaml:"anthropic"`
+	Polling   Polling   `yaml:"polling"`
+	Comments  Comments  `yaml:"comments"`
 }
 
 type Comments struct {
@@ -64,6 +65,13 @@ type Codex struct {
 	RequestTimeout time.Duration `yaml:"requestTimeout"`
 }
 
+type Anthropic struct {
+	APIKey         string        `yaml:"apiKey"`
+	Model          string        `yaml:"model"`
+	MaxTokens      int           `yaml:"maxTokens"`
+	RequestTimeout time.Duration `yaml:"requestTimeout"`
+}
+
 type Promts struct {
 	SystemMessage      string `yaml:"systemMessage"`
 	UserPromptTemplate string `yaml:"userPromptTemplate"`
@@ -107,8 +115,8 @@ func ValidateConfig(config *Config) error {
 	if config.Gitlab.AccessToken == "" {
 		return fmt.Errorf("gitlab.accessToken is required")
 	}
-	if config.OpenAI.APIKey == "" && config.Gemini.APIKey == "" && config.Codex.Command == "" {
-		return fmt.Errorf("either openai.apiKey, gemini.apiKey, or codex.command is required")
+	if config.OpenAI.APIKey == "" && config.Gemini.APIKey == "" && config.Codex.Command == "" && config.Anthropic.APIKey == "" {
+		return fmt.Errorf("either openai.apiKey, gemini.apiKey, anthropic.apiKey, or codex.command is required")
 	}
 	// Allow Codex without API keys; no additional validation needed beyond a command being present.
 	if config.Promts.SystemMessage == "" {

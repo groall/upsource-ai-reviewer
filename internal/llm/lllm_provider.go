@@ -54,6 +54,19 @@ func createLLMProvider(ctx context.Context, cfg *config.Config) (Provider, error
 		return provider, nil
 	}
 
+	if cfg.Anthropic.APIKey != "" {
+		provider, err := llm.NewAnthropicCompletion(ctx, &llm.AnthropicConfig{
+			APIKey:         cfg.Anthropic.APIKey,
+			Model:          cfg.Anthropic.Model,
+			MaxTokens:      cfg.Anthropic.MaxTokens,
+			RequestTimeout: cfg.Anthropic.RequestTimeout,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Anthropic client: %w", err)
+		}
+		return provider, nil
+	}
+
 	return nil, fmt.Errorf("no LLM provider configured")
 
 }
