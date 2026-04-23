@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/groall/upsource-go-client/client"
 
@@ -105,11 +106,11 @@ func findRangeInFileContent(fileContent string, line int) (int32, int32, error) 
 
 	var offset int
 	for i := 0; i < lineIndex; i++ {
-		offset += len(lines[i]) + 1 // +1 for the '\n'
+		offset += utf8.RuneCount([]byte(lines[i])) + 1 // +1 for the '\n'
 	}
 
 	startOffset := int32(offset)
-	endOffset := startOffset + int32(len(lineContent))
+	endOffset := startOffset + int32(utf8.RuneCount([]byte(lineContent)))
 
 	return startOffset, endOffset, nil
 }
