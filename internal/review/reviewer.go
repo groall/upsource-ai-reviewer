@@ -21,6 +21,7 @@ type Reviewer struct {
 	ctx            context.Context
 	llmReviewer    *llm.Reviewer
 	gitProvider    git.Provider
+	replier        *replier
 }
 
 // New creates a new Reviewer instance.
@@ -44,10 +45,16 @@ func New(ctx context.Context, config *config.Config) (*Reviewer, error) {
 		return nil, fmt.Errorf("failed to create LLM reviewer: %w", err)
 	}
 
+	replier, err := newReplier(ctx, config, upsourceClient, gitlabProvider, llmReviewer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create replier: %w", err)
+	}
+
 	return &Reviewer{
 		upsourceClient: upsourceClient,
 		gitProvider:    gitlabProvider,
 		llmReviewer:    llmReviewer,
+		replier:        replier,
 		config:         config,
 		ctx:            ctx,
 	}, nil
@@ -76,6 +83,10 @@ func (r *Reviewer) Run() error {
 		if err := r.postComments(review, comments); err != nil {
 			log.Printf("Error posting comments for review %s: %v\n", review.GetBranch(), err)
 		}
+	}
+
+	if err := r.replier.replyToOpenThreads(); err != nil {
+		log.Printf("Error during thread replies: %v", err)
 	}
 
 	return nil

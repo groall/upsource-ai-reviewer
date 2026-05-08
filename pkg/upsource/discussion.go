@@ -11,6 +11,99 @@ import (
 	"github.com/groall/upsource-ai-reviewer/pkg/config"
 )
 
+// ListReviewDiscussions returns the discussions belonging to a specific review.
+// Falls back to client-side filtering by ReviewID since the project-scoped query
+// is the only listing endpoint exposed by the Upsource API.
+func ListReviewDiscussions(ctx context.Context, upsourceClient *client.Client, review *Review) ([]client.DiscussionInFileDTO, error) {
+	resp, err := upsourceClient.GetProjectDiscussions(ctx, client.DiscussionsInProjectRequestDTO{
+		ProjectID: review.GetProjectID(),
+		Query:     fmt.Sprintf("review: %s", review.GetReviewID().ReviewID),
+		Limit:     10000,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project discussions: %w", err)
+	}
+
+	want := review.GetReviewID().ReviewID
+	out := make([]client.DiscussionInFileDTO, 0, len(resp.Discussions))
+	for _, d := range resp.Discussions {
+		if d.Review == nil || d.Review.ReviewID.ReviewID != want {
+			continue
+		}
+		out = append(out, d)
+	}
+	return out, nil
+}
+
+// AddDiscussionComment posts a reply comment to an existing discussion.
+func AddDiscussionComment(ctx context.Context, upsourceClient *client.Client, projectID, discussionID, parentCommentID, text string) error {
+	_, err := upsourceClient.AddComment(ctx, client.AddCommentRequestDTO{
+		ProjectID:    projectID,
+		DiscussionID: discussionID,
+		ParentID:     parentCommentID,
+		Text:         text,
+		MarkupType:   markdownMarkupType,
+	})
+	return err
+}
+
+// ResolveDiscussion marks the given discussion as resolved.
+func ResolveDiscussion(ctx context.Context, upsourceClient *client.Client, projectID, discussionID string) error {
+	_, err := upsourceClient.ResolveDiscussion(ctx, client.ResolveDiscussionRequestDTO{
+		ProjectID:    projectID,
+		DiscussionID: discussionID,
+		IsResolved:   true,
+	})
+	return err
+}
+
+// ShouldReplyToDiscussion is the "should the bot reply now?" predicate.
+// Returns the last comment (parent target for the reply) and true when:
+//   - discussion carries reviewedLabel
+//   - is not resolved
+//   - has at least one comment
+//   - the most recent comment was not authored by the bot
+//   - the bot has authored fewer than maxPerThread comments in this thread
+func ShouldReplyToDiscussion(d client.DiscussionInFileDTO, reviewedLabel, botUserID string, maxPerThread int) (client.CommentDTO, bool) {
+	var zero client.CommentDTO
+
+	var hasLabel bool
+	for _, l := range d.Labels {
+		if l.Name == reviewedLabel {
+			hasLabel = true
+			break
+		}
+	}
+	if !hasLabel {
+		return zero, false
+	}
+
+	if d.IsResolved != nil && *d.IsResolved {
+		return zero, false
+	}
+
+	if len(d.Comments) == 0 {
+		return zero, false
+	}
+
+	last := d.Comments[len(d.Comments)-1]
+	if last.AuthorID == botUserID {
+		return zero, false
+	}
+
+	var botCount int
+	for _, c := range d.Comments {
+		if c.AuthorID == botUserID {
+			botCount++
+		}
+	}
+	if maxPerThread > 0 && botCount >= maxPerThread {
+		return zero, false
+	}
+
+	return last, true
+}
+
 type CreateDiscussionRequest struct {
 	Review  *Review
 	Comment string

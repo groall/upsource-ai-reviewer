@@ -34,6 +34,61 @@ func (r *Review) GetGitNamespaceAndName() (string, string) {
 	return r.gitNamespace, r.gitName
 }
 
+func (r *Review) GetReviewID() client.ReviewIdDTO {
+	return r.review.ReviewID
+}
+
+func (r *Review) GetProjectID() string {
+	return r.review.ReviewID.ProjectID
+}
+
+func (r *Review) GetTitle() string {
+	return r.review.Title
+}
+
+// ListReviewedReviews lists open reviews that already carry reviewedLabel.
+// Mirror of ListReviews used by the reply pass to find threads the bot may need to follow up on.
+func ListReviewedReviews(ctx context.Context, upsourceClient *client.Client, query string, reviewedLabel string) ([]*Review, error) {
+	upsourceReviews, err := upsourceClient.GetReviews(ctx, client.ReviewsRequestDTO{
+		Limit: 10000,
+		Query: query,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get upsourceReviews: %w", err)
+	}
+
+	var reviewsToCheck []*Review
+
+	for _, review := range upsourceReviews.Reviews {
+		if review.State != client.ReviewStateEnumOpen {
+			continue
+		}
+		if len(review.Branch) == 0 {
+			continue
+		}
+
+		var hasLabel bool
+		for _, label := range review.Labels {
+			if label.Name == reviewedLabel {
+				hasLabel = true
+				break
+			}
+		}
+		if !hasLabel {
+			continue
+		}
+
+		reviewItem, err := newReviewFromUpsourceReview(ctx, review, upsourceClient)
+		if err != nil {
+			log.Printf("Skipping reviewed review %s due to error: %v\n", review.Title, err)
+			continue
+		}
+		reviewsToCheck = append(reviewsToCheck, reviewItem)
+	}
+
+	return reviewsToCheck, nil
+}
+
 // ListReviews lists reviews in Upsource that match the given query.
 func ListReviews(ctx context.Context, upsourceClient *client.Client, query string, reviewedLabel string, invitationLabel string) ([]*Review, error) {
 	upsourceReviews, err := upsourceClient.GetReviews(ctx, client.ReviewsRequestDTO{

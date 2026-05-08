@@ -18,6 +18,14 @@ type Config struct {
 	Anthropic Anthropic `yaml:"anthropic"`
 	Polling   Polling   `yaml:"polling"`
 	Comments  Comments  `yaml:"comments"`
+	Replies   Replies   `yaml:"replies"`
+}
+
+type Replies struct {
+	Enabled            bool   `yaml:"enabled"`
+	MaxPerThread       int    `yaml:"maxPerThread"`
+	SystemMessage      string `yaml:"systemMessage"`
+	UserPromptTemplate string `yaml:"userPromptTemplate"`
 }
 
 type Comments struct {
@@ -136,6 +144,18 @@ func ValidateConfig(config *Config) error {
 	}
 	if config.Comments.PostInLine != "high" && config.Comments.PostInLine != "mid" && config.Comments.PostInLine != "low" && config.Comments.PostInLine != "none" {
 		return fmt.Errorf("comments.postInLine must be one of: high, mid, low, none")
+	}
+
+	if config.Replies.Enabled {
+		if config.Replies.MaxPerThread <= 0 {
+			return fmt.Errorf("replies.maxPerThread must be > 0 when replies.enabled is true")
+		}
+		if config.Replies.SystemMessage == "" {
+			return fmt.Errorf("replies.systemMessage is required when replies.enabled is true")
+		}
+		if config.Replies.UserPromptTemplate == "" {
+			return fmt.Errorf("replies.userPromptTemplate is required when replies.enabled is true")
+		}
 	}
 
 	return nil

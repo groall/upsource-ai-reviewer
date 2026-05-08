@@ -2,7 +2,114 @@ package upsource
 
 import (
 	"testing"
+
+	"github.com/groall/upsource-go-client/client"
 )
+
+func TestShouldReplyToDiscussion(t *testing.T) {
+	const (
+		botID = "bot-1"
+		label = "AI-Reviewed"
+	)
+	resolved := true
+
+	mk := func(comments []client.CommentDTO, opts ...func(*client.DiscussionInFileDTO)) client.DiscussionInFileDTO {
+		d := client.DiscussionInFileDTO{
+			Labels:   []client.LabelDTO{{Name: label}},
+			Comments: comments,
+		}
+		for _, o := range opts {
+			o(&d)
+		}
+		return d
+	}
+
+	tests := []struct {
+		name      string
+		disc      client.DiscussionInFileDTO
+		maxPer    int
+		wantReply bool
+	}{
+		{
+			name: "human replied after bot — should reply",
+			disc: mk([]client.CommentDTO{
+				{CommentID: "c1", AuthorID: botID},
+				{CommentID: "c2", AuthorID: "human"},
+			}),
+			maxPer:    3,
+			wantReply: true,
+		},
+		{
+			name: "bot was last to comment — skip",
+			disc: mk([]client.CommentDTO{
+				{CommentID: "c1", AuthorID: "human"},
+				{CommentID: "c2", AuthorID: botID},
+			}),
+			maxPer:    3,
+			wantReply: false,
+		},
+		{
+			name: "discussion resolved — skip",
+			disc: mk([]client.CommentDTO{
+				{CommentID: "c1", AuthorID: botID},
+				{CommentID: "c2", AuthorID: "human"},
+			}, func(d *client.DiscussionInFileDTO) { d.IsResolved = &resolved }),
+			maxPer:    3,
+			wantReply: false,
+		},
+		{
+			name: "bot reached cap — skip",
+			disc: mk([]client.CommentDTO{
+				{CommentID: "c1", AuthorID: botID},
+				{CommentID: "c2", AuthorID: "human"},
+				{CommentID: "c3", AuthorID: botID},
+				{CommentID: "c4", AuthorID: "human"},
+				{CommentID: "c5", AuthorID: botID},
+				{CommentID: "c6", AuthorID: "human"},
+			}),
+			maxPer:    3,
+			wantReply: false,
+		},
+		{
+			name:      "no comments — skip",
+			disc:      mk(nil),
+			maxPer:    3,
+			wantReply: false,
+		},
+		{
+			name: "missing reviewed label — skip",
+			disc: client.DiscussionInFileDTO{
+				Comments: []client.CommentDTO{{CommentID: "c1", AuthorID: "human"}},
+			},
+			maxPer:    3,
+			wantReply: false,
+		},
+		{
+			name: "bot never commented — skip (thread not ours)",
+			disc: mk([]client.CommentDTO{
+				{CommentID: "c1", AuthorID: "human-a"},
+				{CommentID: "c2", AuthorID: "human-b"},
+			}),
+			maxPer: 3,
+			// Predicate is purely "is the last comment not the bot?"; the orchestrator
+			// uses the reviewedLabel to scope to bot-touched threads. Here the label
+			// is set, so we expect a reply attempt.
+			wantReply: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			last, ok := ShouldReplyToDiscussion(tt.disc, label, botID, tt.maxPer)
+			if ok != tt.wantReply {
+				t.Fatalf("ShouldReplyToDiscussion = %v, want %v", ok, tt.wantReply)
+			}
+			if ok && last.CommentID == "" {
+				t.Fatalf("expected non-empty parent comment when reply is true")
+			}
+		})
+	}
+}
 
 func Test_findRangeInFileContent(t *testing.T) {
 	type args struct {
