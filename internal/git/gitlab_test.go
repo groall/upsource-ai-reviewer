@@ -51,7 +51,7 @@ func TestGetReviewChanges(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v4/projects/group/repo/repository/compare" {
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, `{
+			_, _ = fmt.Fprint(w, `{
 				"commits": [{"id": "123", "message": "feat: new feature"}],
 				"diffs": [{
 					"old_path": "file.go",
@@ -92,7 +92,7 @@ func TestGetReviewChanges_NoDiffs(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v4/projects/group/repo/repository/compare" {
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, `{"commits": [], "diffs": []}`)
+			_, _ = fmt.Fprint(w, `{"commits": [], "diffs": []}`)
 		}
 	}))
 	defer server.Close()
