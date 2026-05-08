@@ -86,12 +86,12 @@ func (r *Reviewer) doReview(review *upsource.Review) ([]*llm.ReviewComment, erro
 
 	changes, commitsComments, err := r.gitProvider.GetReviewChanges(review)
 	if err != nil {
-		return nil, fmt.Errorf("Error getting review changes for %s: %w\n", review.GetBranch(), err)
+		return nil, fmt.Errorf("error getting review changes for %s: %w", review.GetBranch(), err)
 	}
 
 	comments, err := r.llmReviewer.Do(changes, commitsComments)
 	if err != nil {
-		return nil, fmt.Errorf("Error getting review comments for %s: %w\n", review.GetBranch(), err)
+		return nil, fmt.Errorf("error getting review comments for %s: %w", review.GetBranch(), err)
 	}
 
 	if err := upsource.AddReviewLabel(r.ctx, r.upsourceClient, review, r.config.Upsource.ReviewedLabel); err != nil {

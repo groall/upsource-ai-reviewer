@@ -25,7 +25,7 @@ type AnthropicCompletion struct {
 
 func NewAnthropicCompletion(ctx context.Context, cfg *AnthropicConfig) (*AnthropicCompletion, error) {
 	if cfg.APIKey == "" {
-		return nil, fmt.Errorf("Anthropic API key is required")
+		return nil, fmt.Errorf("anthropic API key is required")
 	}
 
 	client := anthropic.NewClient(option.WithAPIKey(cfg.APIKey))
@@ -58,7 +58,7 @@ func (c *AnthropicCompletion) Completion(userPrompt, systemPrompt string) (strin
 		},
 	})
 	if err != nil {
-		return "", fmt.Errorf("Anthropic request failed: %w", err)
+		return "", fmt.Errorf("anthropic request failed: %w", err)
 	}
 
 	for _, block := range resp.Content {

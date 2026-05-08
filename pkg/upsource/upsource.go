@@ -100,17 +100,17 @@ func newReviewFromUpsourceReview(ctx context.Context, upsourceReview client.Revi
 
 	projectVcsLinks, err := upsourceClient.GetProjectVcsLinks(ctx, projectID)
 	if err != nil {
-		return nil, fmt.Errorf("Error getting project VCS links for %s: %v\n", upsourceReview.Title, err)
+		return nil, fmt.Errorf("error getting project VCS links for %s: %v", upsourceReview.Title, err)
 	}
 
 	groupPath, repoName, err := parseGitGroupAndName(projectVcsLinks.Repo[0].URL[0])
 	if err != nil {
-		return nil, fmt.Errorf("Error parsing Git group and name for %s: %v\n", projectID, err)
+		return nil, fmt.Errorf("error parsing Git group and name for %s: %v", projectID, err)
 	}
 
 	projectInfo, err := upsourceClient.GetProjectInfo(ctx, projectID)
 	if err != nil {
-		return nil, fmt.Errorf("Error getting project info for %s: %v\n", upsourceReview.Title, err)
+		return nil, fmt.Errorf("error getting project info for %s: %v", upsourceReview.Title, err)
 	}
 
 	var t = true
@@ -121,7 +121,7 @@ func newReviewFromUpsourceReview(ctx context.Context, upsourceReview client.Revi
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Error getting review summary changes for %s: %v\n", upsourceReview.Title, err)
+		return nil, fmt.Errorf("error getting review summary changes for %s: %v", upsourceReview.Title, err)
 	}
 
 	return &Review{

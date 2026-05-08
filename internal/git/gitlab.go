@@ -60,7 +60,7 @@ func (g *GitlabProvider) GetReviewChanges(review Review) (string, string, error)
 	}
 
 	if len(comparison.Diffs) == 0 {
-		return "", "", fmt.Errorf("No diffs found between '%s' and '%s'.\n", review.GetDefaultBranch(), review.GetBranch())
+		return "", "", fmt.Errorf("no diffs found between '%s' and '%s'", review.GetDefaultBranch(), review.GetBranch())
 	}
 
 	return createChangesText(comparison.Diffs), createCommitsCommentsText(comparison.Commits), nil

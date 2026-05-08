@@ -42,7 +42,7 @@ func CreateDiscussion(ctx context.Context, upsourceClient *client.Client, config
 
 		anchor, err := createAnchorForLine(ctx, upsourceClient, fileDiffSummary, req.Line)
 		if err != nil {
-			return fmt.Errorf("Error creating anchor for line %d in file %s: %v\n", req.Line, req.File, err)
+			return fmt.Errorf("error creating anchor for line %d in file %s: %v", req.Line, req.File, err)
 		}
 
 		_, err = upsourceClient.CreateDiscussion(ctx, client.CreateDiscussionRequestDTO{
@@ -68,13 +68,13 @@ func createAnchorForLine(ctx context.Context, upsourceClient *client.Client, fil
 		FileName:   fileDiffSummary.File.FileName,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Error getting file content for %s: %v\n", fileDiffSummary.File.FileName, err)
+		return nil, fmt.Errorf("error getting file content for %s: %v", fileDiffSummary.File.FileName, err)
 	}
 
 	text := fileContent.FileContent.Text
 	startOffset, endOffset, err := findRangeInFileContent(text, line)
 	if err != nil {
-		return nil, fmt.Errorf("Error finding range for line %d in file %s: %v\n", line, fileDiffSummary.File.FileName, err)
+		return nil, fmt.Errorf("error finding range for line %d in file %s: %v", line, fileDiffSummary.File.FileName, err)
 	}
 
 	return &client.AnchorDTO{
