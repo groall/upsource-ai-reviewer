@@ -49,6 +49,12 @@ func TestNewGitlabProvider(t *testing.T) {
 
 func TestGetReviewChanges(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v4/projects/group/repo/repository/branches" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprint(w, `[{"name":"main","default":true}]`)
+			return
+		}
+
 		if r.URL.Path == "/api/v4/projects/group/repo/repository/compare" {
 			w.WriteHeader(http.StatusOK)
 			_, _ = fmt.Fprint(w, `{
@@ -56,11 +62,7 @@ func TestGetReviewChanges(t *testing.T) {
 				"diffs": [{
 					"old_path": "file.go",
 					"new_path": "file.go",
-					"diff": "--- a/file.go
-+++ b/file.go
-@@ -1,1 +1,1 @@
--hello
-+world"
+					"diff": "--- a/file.go\n+++ b/file.go\n@@ -1,1 +1,1 @@\n-hello\n+world"
 				}]
 			}`)
 		}
@@ -90,6 +92,12 @@ func TestGetReviewChanges(t *testing.T) {
 
 func TestGetReviewChanges_NoDiffs(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v4/projects/group/repo/repository/branches" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprint(w, `[{"name":"main","default":true}]`)
+			return
+		}
+
 		if r.URL.Path == "/api/v4/projects/group/repo/repository/compare" {
 			w.WriteHeader(http.StatusOK)
 			_, _ = fmt.Fprint(w, `{"commits": [], "diffs": []}`)
