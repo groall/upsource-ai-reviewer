@@ -47,7 +47,7 @@ func (c *AnthropicCompletion) Completion(userPrompt, systemPrompt string) (strin
 	}
 
 	resp, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:     anthropic.Model(c.config.Model),
+		Model:     c.config.Model,
 		MaxTokens: int64(maxTokens),
 		System: []anthropic.TextBlockParam{{
 			Text:         systemPrompt,
