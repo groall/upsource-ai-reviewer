@@ -130,11 +130,11 @@ func (r *Reviewer) postComments(review *upsource.Review, comments []*llm.ReviewC
 	for _, comment := range comments {
 		thereIsLine := comment.LineNumber > 0 && comment.FilePath != "" && comment.LineVerified
 		switch {
-		case comment.Severity == llm.SeverityHigh && r.config.Comments.PostInLine == "high" && thereIsLine:
+		case comment.Severity == llm.SeverityHigh && r.config.Review.PostInLine == "high" && thereIsLine:
 			inlineComments = append(inlineComments, comment)
-		case (comment.Severity == llm.SeverityMedium || comment.Severity == llm.SeverityHigh) && r.config.Comments.PostInLine == "mid" && thereIsLine:
+		case (comment.Severity == llm.SeverityMedium || comment.Severity == llm.SeverityHigh) && r.config.Review.PostInLine == "mid" && thereIsLine:
 			inlineComments = append(inlineComments, comment)
-		case r.config.Comments.PostInLine == "low" && thereIsLine:
+		case r.config.Review.PostInLine == "low" && thereIsLine:
 			inlineComments = append(inlineComments, comment)
 		default:
 			postInOneComments = append(postInOneComments, comment)

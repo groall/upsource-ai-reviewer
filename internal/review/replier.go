@@ -89,9 +89,10 @@ func (r *replier) replyInReview(review *upsource.Review, botUserID string) error
 		}
 
 		thread := buildThreadTranscript(d.Comments, botUserID)
-		fileContext := buildFileContext(d.Anchor, codeContext)
+		fileContext := codeContext
+		anchorText := buildReplyAnchorText(d.Anchor)
 
-		reply, lerr := r.llmReviewer.Reply(thread, fileContext)
+		reply, lerr := r.llmReviewer.Reply(thread, fileContext, anchorText)
 		if lerr != nil {
 			log.Printf("Failed to get reply for discussion %s: %v\n", d.DiscussionID, lerr)
 			continue
@@ -143,9 +144,15 @@ func buildThreadTranscript(comments []client.CommentDTO, botUserID string) []llm
 	return out
 }
 
-func buildFileContext(anchor client.AnchorDTO, diff string) string {
+func buildReplyAnchorText(anchor client.AnchorDTO) string {
 	if anchor.FileID == "" {
-		return diff
+		return ""
 	}
-	return fmt.Sprintf("Inline discussion anchored at %s\n\nFull diff:\n%s", anchor.FileID, diff)
+
+	var rangeText string
+	if anchor.Range != nil {
+		rangeText = fmt.Sprintf(" range=[%d,%d]", anchor.Range.StartOffset, anchor.Range.EndOffset)
+	}
+
+	return fmt.Sprintf("fileId=%s revisionId=%s inlineInRevision=%s%s", anchor.FileID, anchor.RevisionID, anchor.InlineInRevision, rangeText)
 }

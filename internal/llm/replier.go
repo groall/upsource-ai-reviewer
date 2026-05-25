@@ -20,17 +20,39 @@ type ReplyResult struct {
 	Close   bool   `json:"close"`
 }
 
+const replyUserPromptPrefixTemplate = `### Original code context
+%s
+
+### Discussion anchor
+%s
+
+### Discussion so far (oldest first)
+`
+
 // Reply asks the LLM to produce a follow-up reply for a discussion thread.
-func (c *Reviewer) Reply(thread []CommentMsg, codeContext string) (*ReplyResult, error) {
-	if c.config.Replies.SystemMessage == "" || c.config.Replies.UserPromptTemplate == "" {
-		return nil, fmt.Errorf("replies prompt templates are not configured")
+func (c *Reviewer) Reply(thread []CommentMsg, codeContext string, anchorText string) (*ReplyResult, error) {
+	if c.config.Replies.SystemMessage == "" {
+		return nil, fmt.Errorf("replies.systemMessage is not configured")
 	}
 
-	userPrompt := fmt.Sprintf(c.config.Replies.UserPromptTemplate, codeContext, formatThread(thread))
+	threadText := formatThread(thread)
+	userPrompt, prefix, suffix := buildReplyPromptParts(codeContext, anchorText, threadText)
 
 	log.Print("Sending reply prompt to LLM...")
 
-	resp, err := c.llmProvider.Completion(userPrompt, c.config.Replies.SystemMessage)
+	var (
+		resp string
+		err  error
+	)
+	if prefix != "" {
+		if p, ok := c.llmProvider.(PrefixCacheProvider); ok {
+			resp, err = p.CompletionWithPrefixCache(prefix, suffix, c.config.Replies.SystemMessage)
+		} else {
+			resp, err = c.llmProvider.Completion(userPrompt, c.config.Replies.SystemMessage)
+		}
+	} else {
+		resp, err = c.llmProvider.Completion(userPrompt, c.config.Replies.SystemMessage)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("LLM reply request failed: %w", err)
 	}
@@ -49,6 +71,12 @@ func (c *Reviewer) Reply(thread []CommentMsg, codeContext string) (*ReplyResult,
 	return &result, nil
 }
 
+func buildReplyPromptParts(codeContext, anchorText, threadText string) (fullPrompt, prefix, suffix string) {
+	prefix = fmt.Sprintf(replyUserPromptPrefixTemplate, codeContext, anchorText)
+	suffix = threadText + "\n"
+	return prefix + suffix, prefix, suffix
+}
+
 func formatThread(thread []CommentMsg) string {
 	var b strings.Builder
 	for i, m := range thread {
@@ -61,5 +89,6 @@ func formatThread(thread []CommentMsg) string {
 		}
 		fmt.Fprintf(&b, "%s (%s):\n%s", role, m.Author, m.Text)
 	}
+
 	return b.String()
 }

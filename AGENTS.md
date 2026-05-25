@@ -21,7 +21,7 @@ main.go (ticker)
        │    ├─ pkg/upsource             ListReviews() — filter by reviewedLabel / invitationLabel
        │    ├─ internal/git/gitlab.go   GetReviewChanges() — fetch diff via GitLab branch compare
        │    ├─ internal/llm/reviewer.go Reviewer.Do() — format prompt, call LLM, parse JSON
-       │    │    └─ internal/llm/lllm_provider.go  createLLMProvider() — pick provider from config
+       │    │    └─ internal/llm/llm_provider.go  createLLMProvider() — pick provider from config
        │    │         └─ pkg/llm/       openai.go | gemini.go | anthropic.go | codex.go
        │    └─ pkg/upsource             CreateDiscussion() — post inline or general comments
        └─ reply pass (open threads)
@@ -43,7 +43,7 @@ internal/review/reviewer.go    main orchestration loop
 internal/review/replier.go     reply pass — scan reviewed reviews, post follow-up replies
 internal/llm/reviewer.go       prompt formatting, LLM call, JSON parsing
 internal/llm/replier.go        reply-shaped LLM call (plain prose, no JSON)
-internal/llm/lllm_provider.go  provider factory
+internal/llm/llm_provider.go   provider factory
 internal/llm/comment.go        ReviewComment struct, severity constants
 internal/llm/diff_validator.go validateCommentsAgainstDiff — line number verification
 internal/git/gitlab.go         GitLab diff fetching
@@ -61,15 +61,14 @@ At least one must be configured or startup fails.
 | Section | Key fields |
 |---|---|
 | `polling` | `intervalSeconds` |
-| `comments` | `maxPerReview`, `postInLine` (high / mid / low / none) |
+| `review` | `maxPerReview`, `postInLine` (high / mid / low / none), `systemMessage`, `userPromptTemplate` |
 | `upsource` | `baseUrl`, `username`, `password`, `query`, `reviewedLabel`, `invitationLabel` |
 | `gitlab` | `baseUrl`, `accessToken` |
 | `openai` | `apiKey`, `endpoint`, `model`, `maxTokens`, `temperature`, `requestTimeout` |
 | `gemini` | `apiKey`, `model`, `maxTokens` |
 | `anthropic` | `apiKey`, `model`, `maxTokens`, `requestTimeout` |
 | `codex` | `command`, `workdir`, `requestTimeout` |
-| `promts` | `systemMessage` (`%d` for maxPerReview), `userPromptTemplate` (`%s` diff, `%s` commits) |
-| `replies` | `enabled`, `maxPerThread`, `systemMessage`, `userPromptTemplate` (`%s` code context, `%s` thread transcript) |
+| `replies` | `enabled`, `maxPerThread`, `systemMessage` |
 
 ## Review Flow
 
@@ -77,7 +76,7 @@ At least one must be configured or startup fails.
 2. Skip reviews already labeled with `reviewedLabel`
 3. If `invitationLabel` is set, skip reviews that do not have it (opt-in mode)
 4. Fetch the GitLab diff for the review's branch
-5. Send diff + commit messages to the LLM using `promts` templates
+5. Send diff + commit messages to the LLM
 6. Parse the JSON array response: `[{filePath, lineNumber, lineVerified, comment, severity}]`
 7. Validate reported line numbers against the actual diff (`diff_validator.go`)
 8. Post comments to Upsource; add `reviewedLabel` to prevent re-processing
@@ -104,7 +103,7 @@ Idempotency comes from "the last comment in the thread is from the AI user" — 
 
 ## Comment Posting
 
-Comments are split into two groups based on `comments.postInLine`:
+Comments are split into two groups based on `review.postInLine`:
 
 * **Inline** — severity meets the threshold AND `lineVerified=true` AND `lineNumber > 0`; posted as individual per-line Upsource discussions
 * **General** — remaining comments batched into one discussion formatted as `### Low-Medium Priority Comments (AI generated)`

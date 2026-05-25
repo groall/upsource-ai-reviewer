@@ -72,3 +72,50 @@ func (c *AnthropicCompletion) Completion(userPrompt, systemPrompt string) (strin
 
 	return "", fmt.Errorf("empty LLM response")
 }
+
+func (c *AnthropicCompletion) CompletionWithPrefixCache(userPromptPrefix, userPromptSuffix, systemPrompt string) (string, error) {
+	if strings.TrimSpace(userPromptPrefix) == "" {
+		return c.Completion(userPromptSuffix, systemPrompt)
+	}
+
+	ctx, cancel := context.WithTimeout(c.ctx, c.config.RequestTimeout)
+	defer cancel()
+
+	maxTokens := c.config.MaxTokens
+	if maxTokens <= 0 {
+		maxTokens = 4096
+	}
+
+	resp, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
+		Model:     c.config.Model,
+		MaxTokens: int64(maxTokens),
+		System: []anthropic.TextBlockParam{{
+			Text: systemPrompt,
+		}},
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(
+				anthropic.ContentBlockParamUnion{OfText: &anthropic.TextBlockParam{
+					Text:         userPromptPrefix,
+					CacheControl: anthropic.NewCacheControlEphemeralParam(),
+				}},
+				anthropic.ContentBlockParamUnion{OfText: &anthropic.TextBlockParam{
+					Text: userPromptSuffix,
+				}},
+			),
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("anthropic request failed: %w", err)
+	}
+
+	for _, block := range resp.Content {
+		if tb, ok := block.AsAny().(anthropic.TextBlock); ok {
+			content := strings.TrimSpace(tb.Text)
+			if content != "" {
+				return content, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("empty LLM response")
+}

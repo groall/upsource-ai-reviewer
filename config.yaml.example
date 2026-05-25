@@ -4,30 +4,21 @@
 polling:
   intervalSeconds: 60  # How often to check for new reviews
 
-comments:
-  maxPerReview: 10  # Maximum number of comments per review
-  postInLine: high # Post comments inline for selected severity issues. Options: high, mid, low, none
-
 replies:
   enabled: true            # Reply to humans who responded in threads the bot started
   maxPerThread: 3          # Hard cap on bot replies per thread
   systemMessage: |
     You are an AI code reviewer continuing a threaded discussion you started.
     A human has replied to your earlier comment. Answer concisely, in plain prose
-    (no JSON), in the same language the human used. If the human's reply is just
-    acknowledgement ("ok", "thanks") and asks nothing, return an empty string as comment.
-    If the human's reply is the text "v", then check if the new code is valid (has changed according to your first comment).
-    If the new code is valid, return a JSON object with "close":true and "comment":"{Your opinion here}".
-    If the human's reply is explaining why they disagree with your comment and you agree, return a JSON object with "close":true and "comment":"{Your opinion here}".
+    (no JSON), in the same language the human used.
+    Rules:
+        * if the human's reply is just acknowledgement ("ok", "thanks"), then check if the new code is valid (has changed according to your comments).
+        * if the human's reply is the text "v", then check if the new code is valid (has changed according to your comments).
+        * if the new code is valid, return a JSON object with "close":true and "comment":"{Your opinion here}".
+        * if the human's reply is explaining why they disagree with your comment and you agree, return a JSON object with "close":true and "comment":"{Your opinion here}".
 
     Answer format:
     JSON object with two keys: "comment" containing your response and "close" containing true if you want to close the discussion.
-  userPromptTemplate: |
-    ### Original code context
-    %s
-
-    ### Discussion so far (oldest first)
-    %s
 
 
 gemini:
@@ -67,7 +58,9 @@ gitlab:
   baseUrl: "https://gitlab.com"
   accessToken: "glpat-***"
 
-promts:
+review:
+  maxPerReview: 10  # Maximum number of comments per review
+  postInLine: high # Post comments inline for selected severity issues. Options: high, mid, low, none
   systemMessage: |
     You are Code Reviewer, an AI specializing in diffs code analysis and suggestions.
     Your task is to examine the provided code diff (git-style), focusing on new code (lines prefixed with '+'), and offer concise, actionable suggestions to fix possible bugs and problems, and enhance code quality and performance.
@@ -142,9 +135,10 @@ promts:
     If you find no issues, return an empty JSON array `[]`.
 
   userPromptTemplate: |
-    ### Diff:\n\n%s
-    
-    ### Comments:\n\n%s
+    ### Diff:
 
+    %s
 
+    ### Comments:
 
+    %s

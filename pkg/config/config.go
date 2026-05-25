@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v2"
@@ -11,26 +12,26 @@ import (
 type Config struct {
 	Upsource  Upsource  `yaml:"upsource"`
 	Gitlab    Gitlab    `yaml:"gitlab"`
-	Promts    Promts    `yaml:"promts"`
+	Review    Review    `yaml:"review"`
 	OpenAI    OpenAI    `yaml:"openai"`
 	Codex     Codex     `yaml:"codex"`
 	Gemini    Gemini    `yaml:"gemini"`
 	Anthropic Anthropic `yaml:"anthropic"`
 	Polling   Polling   `yaml:"polling"`
-	Comments  Comments  `yaml:"comments"`
 	Replies   Replies   `yaml:"replies"`
 }
 
 type Replies struct {
-	Enabled            bool   `yaml:"enabled"`
-	MaxPerThread       int    `yaml:"maxPerThread"`
-	SystemMessage      string `yaml:"systemMessage"`
-	UserPromptTemplate string `yaml:"userPromptTemplate"`
+	Enabled       bool   `yaml:"enabled"`
+	MaxPerThread  int    `yaml:"maxPerThread"`
+	SystemMessage string `yaml:"systemMessage"`
 }
 
-type Comments struct {
-	MaxPerReview int    `yaml:"maxPerReview"`
-	PostInLine   string `yaml:"postInLine"` // high, mid, low, none
+type Review struct {
+	MaxPerReview       int    `yaml:"maxPerReview"`
+	PostInLine         string `yaml:"postInLine"` // high, mid, low, none
+	SystemMessage      string `yaml:"systemMessage"`
+	UserPromptTemplate string `yaml:"userPromptTemplate"`
 }
 
 type Gemini struct {
@@ -80,11 +81,6 @@ type Anthropic struct {
 	RequestTimeout time.Duration `yaml:"requestTimeout"`
 }
 
-type Promts struct {
-	SystemMessage      string `yaml:"systemMessage"`
-	UserPromptTemplate string `yaml:"userPromptTemplate"`
-}
-
 // LoadConfig reads and parses the configuration YAML file
 func LoadConfig(filename string) (*Config, error) {
 	data, err := os.ReadFile(filename)
@@ -127,23 +123,31 @@ func ValidateConfig(config *Config) error {
 		return fmt.Errorf("either openai.apiKey, gemini.apiKey, anthropic.apiKey, or codex.command is required")
 	}
 	// Allow Codex without API keys; no additional validation needed beyond a command being present.
-	if config.Promts.SystemMessage == "" {
-		return fmt.Errorf("promts.systemMessage is required")
-	}
-	if config.Promts.UserPromptTemplate == "" {
-		return fmt.Errorf("promts.userPromptTemplate is required")
-	}
 	if config.Polling.IntervalSeconds == 0 {
 		return fmt.Errorf("polling.intervalSeconds is required")
 	}
-	if config.Comments.MaxPerReview == 0 {
-		return fmt.Errorf("comments.maxPerReview is required")
+
+	if config.Review.MaxPerReview == 0 {
+		return fmt.Errorf("review.maxPerReview is required")
 	}
-	if config.Comments.PostInLine == "" {
-		return fmt.Errorf("comments.postInLine is required")
+	if config.Review.PostInLine == "" {
+		return fmt.Errorf("review.postInLine is required")
 	}
-	if config.Comments.PostInLine != "high" && config.Comments.PostInLine != "mid" && config.Comments.PostInLine != "low" && config.Comments.PostInLine != "none" {
-		return fmt.Errorf("comments.postInLine must be one of: high, mid, low, none")
+	if config.Review.PostInLine != "high" && config.Review.PostInLine != "mid" && config.Review.PostInLine != "low" && config.Review.PostInLine != "none" {
+		return fmt.Errorf("review.postInLine must be one of: high, mid, low, none")
+	}
+	if config.Review.SystemMessage == "" {
+		return fmt.Errorf("review.systemMessage is required")
+	}
+	// Guard against accidental missing fmt args in templates.
+	if s := fmt.Sprintf(config.Review.SystemMessage, config.Review.MaxPerReview); s == "" || containsFmtError(s) {
+		return fmt.Errorf("review.systemMessage is not a valid fmt template (expected maxPerReview placeholder like %%d)")
+	}
+	if config.Review.UserPromptTemplate == "" {
+		return fmt.Errorf("review.userPromptTemplate is required")
+	}
+	if s := fmt.Sprintf(config.Review.UserPromptTemplate, "diff", "commits"); s == "" || containsFmtError(s) {
+		return fmt.Errorf("review.userPromptTemplate is not a valid fmt template (expected placeholders for diff and commits comments)")
 	}
 
 	if config.Replies.Enabled {
@@ -153,10 +157,12 @@ func ValidateConfig(config *Config) error {
 		if config.Replies.SystemMessage == "" {
 			return fmt.Errorf("replies.systemMessage is required when replies.enabled is true")
 		}
-		if config.Replies.UserPromptTemplate == "" {
-			return fmt.Errorf("replies.userPromptTemplate is required when replies.enabled is true")
-		}
 	}
 
 	return nil
+}
+
+func containsFmtError(s string) bool {
+	// fmt.Sprintf reports formatting problems as "%!<verb>(...)".
+	return strings.Contains(s, "%!")
 }

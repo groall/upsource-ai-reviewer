@@ -13,6 +13,16 @@ type Provider interface {
 	Completion(userPrompt, systemPrompt string) (string, error)
 }
 
+// PrefixCacheProvider is an optional extension interface for providers that can
+// cache a stable prefix of the user prompt independently from the suffix.
+//
+// Implementations should treat userPromptPrefix as the cacheable part and
+// userPromptSuffix as non-cacheable.
+type PrefixCacheProvider interface {
+	Provider
+	CompletionWithPrefixCache(userPromptPrefix, userPromptSuffix, systemPrompt string) (string, error)
+}
+
 // createLLMProvider creates an LLM provider based on the configuration.
 func createLLMProvider(ctx context.Context, cfg *config.Config) (Provider, error) {
 	if cfg.Codex.Command != "" {

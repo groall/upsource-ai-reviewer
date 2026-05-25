@@ -70,6 +70,44 @@ func (c *OpenAICompletion) Completion(userPrompt, systemPrompt string) (string, 
 	return content, nil
 }
 
+// CompletionWithPrefixCache is best-effort prompt prefix caching for OpenAI.
+//
+// OpenAI Prompt Caching is automatic and based on the longest matching prompt
+// prefix. This method keeps the stable prefix in its own message to maximize
+// deterministic prefix reuse when only the suffix changes.
+func (c *OpenAICompletion) CompletionWithPrefixCache(userPromptPrefix, userPromptSuffix, systemPrompt string) (string, error) {
+	if strings.TrimSpace(userPromptPrefix) == "" {
+		return c.Completion(userPromptSuffix, systemPrompt)
+	}
+
+	ctx, cancel := context.WithTimeout(c.ctx, c.config.RequestTimeout)
+	defer cancel()
+
+	resp, err := c.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+		Model:               c.config.Model,
+		MaxCompletionTokens: c.config.MaxTokens,
+		Temperature:         c.config.Temperature,
+		Messages: []openai.ChatCompletionMessage{
+			{Role: openai.ChatMessageRoleSystem, Content: systemPrompt},
+			{Role: openai.ChatMessageRoleUser, Content: userPromptPrefix},
+			{Role: openai.ChatMessageRoleUser, Content: userPromptSuffix},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("OpenAI request failed: %w", err)
+	}
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("no choices in OpenAI response")
+	}
+
+	content := strings.TrimSpace(resp.Choices[0].Message.Content)
+	if content == "" {
+		return "", fmt.Errorf("empty LLM response")
+	}
+
+	return content, nil
+}
+
 // normalizeOpenAIBaseURL ensures the BaseURL is suitable for go-openai client
 // - appends "/v1" if missing
 // - trims any path after "/v1/" if a full endpoint URL was provided
