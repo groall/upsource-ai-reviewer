@@ -4,3 +4,7 @@ vendor/
 /config.yaml
 /upsource_ai_reviewer
 .env
+/.codex/
+/.mcp.json
+/.claude/
+/.agents/
