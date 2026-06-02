@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/groall/upsource-ai-reviewer/internal/git"
+	"github.com/groall/upsource-ai-reviewer/internal/metrics"
 	"github.com/groall/upsource-ai-reviewer/pkg/config"
 	"github.com/groall/upsource-go-client/client"
 
@@ -103,6 +104,7 @@ func (r *replier) replyInReview(review *upsource.Review, botUserID string) error
 				log.Printf("Failed to post reply for discussion %s: %v\n", d.DiscussionID, err)
 				continue
 			}
+			metrics.DefaultRecorder.RecordReplySent()
 			log.Printf("Posted reply in discussion %s (review %s)\n", d.DiscussionID, review.GetBranch())
 		}
 

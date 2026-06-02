@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/groall/upsource-ai-reviewer/pkg/config"
-	"github.com/groall/upsource-ai-reviewer/pkg/llm"
+	pkgllm "github.com/groall/upsource-ai-reviewer/pkg/llm"
 )
 
 // Provider is an interface for LLM completion providers.
@@ -26,7 +26,7 @@ type PrefixCacheProvider interface {
 // createLLMProvider creates an LLM provider based on the configuration.
 func createLLMProvider(ctx context.Context, cfg *config.Config) (Provider, error) {
 	if cfg.Codex.Command != "" {
-		provider, err := llm.NewCodexCompletion(ctx, &llm.CodexConfig{
+		provider, err := pkgllm.NewCodexCompletion(ctx, &pkgllm.CodexConfig{
 			Command:        cfg.Codex.Command,
 			Workdir:        cfg.Codex.Workdir,
 			RequestTimeout: cfg.Codex.RequestTimeout,
@@ -38,7 +38,7 @@ func createLLMProvider(ctx context.Context, cfg *config.Config) (Provider, error
 	}
 
 	if cfg.OpenAI.APIKey != "" {
-		provider, err := llm.NewOpenAICompletion(ctx, &llm.OpenAIConfig{
+		provider, err := pkgllm.NewOpenAICompletion(ctx, &pkgllm.OpenAIConfig{
 			APIKey:         cfg.OpenAI.APIKey,
 			Endpoint:       cfg.OpenAI.Endpoint,
 			Model:          cfg.OpenAI.Model,
@@ -53,7 +53,7 @@ func createLLMProvider(ctx context.Context, cfg *config.Config) (Provider, error
 	}
 
 	if cfg.Gemini.APIKey != "" {
-		provider, err := llm.NewGeminiCompletion(ctx, &llm.GeminiConfig{
+		provider, err := pkgllm.NewGeminiCompletion(ctx, &pkgllm.GeminiConfig{
 			APIKey:    cfg.Gemini.APIKey,
 			Model:     cfg.Gemini.Model,
 			MaxTokens: int32(cfg.Gemini.MaxTokens),
@@ -65,7 +65,7 @@ func createLLMProvider(ctx context.Context, cfg *config.Config) (Provider, error
 	}
 
 	if cfg.Anthropic.APIKey != "" {
-		provider, err := llm.NewAnthropicCompletion(ctx, &llm.AnthropicConfig{
+		provider, err := pkgllm.NewAnthropicCompletion(ctx, &pkgllm.AnthropicConfig{
 			APIKey:         cfg.Anthropic.APIKey,
 			Model:          cfg.Anthropic.Model,
 			MaxTokens:      cfg.Anthropic.MaxTokens,

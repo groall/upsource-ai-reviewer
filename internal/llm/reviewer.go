@@ -7,6 +7,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/groall/upsource-ai-reviewer/internal/metrics"
 	"github.com/groall/upsource-ai-reviewer/pkg/config"
 )
 
@@ -41,11 +42,11 @@ func (c *Reviewer) Do(changes string, commitsComments string) ([]*ReviewComment,
 
 	log.Print("Sending prompt to LLM...")
 
-	llmResponse, err := c.llmProvider.Completion(prompt, systemMessage)
+	llmResponse, err := c.complete(prompt, systemMessage)
 	if err != nil {
+		metrics.DefaultRecorder.RecordLLMError(metrics.OperationReview, c.config)
 		return nil, fmt.Errorf("LLM request failed: %w", err)
 	}
-
 	log.Printf("Received LLM response: %s\n", llmResponse)
 
 	comments, err := processAndPostLLMResponse(llmResponse)
@@ -56,6 +57,10 @@ func (c *Reviewer) Do(changes string, commitsComments string) ([]*ReviewComment,
 	comments = validateCommentsAgainstDiff(changes, comments)
 
 	return comments, nil
+}
+
+func (c *Reviewer) complete(userPrompt, systemPrompt string) (string, error) {
+	return c.llmProvider.Completion(userPrompt, systemPrompt)
 }
 
 // processAndPostLLMResponse processes the LLM response and returns the review comments.

@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/groall/upsource-ai-reviewer/internal/metrics"
 	"github.com/groall/upsource-ai-reviewer/internal/review"
 	"github.com/groall/upsource-ai-reviewer/pkg/config"
 )
@@ -30,7 +31,13 @@ func main() {
 		log.Fatalf("Invalid config: %v", err)
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if err := metrics.StartServer(ctx, appConfig.Metrics); err != nil {
+		log.Fatalf("Failed to start metrics server: %v", err)
+	}
+
 	reviewer, err := review.New(ctx, appConfig)
 	if err != nil {
 		log.Fatalf("Failed to create reviewer: %v", err)
@@ -62,6 +69,7 @@ func main() {
 			}
 		case sig := <-sigChan:
 			log.Printf("Received signal %v, shutting down gracefully...", sig)
+			cancel()
 			return
 		}
 	}

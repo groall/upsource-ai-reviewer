@@ -19,6 +19,13 @@ type Config struct {
 	Anthropic Anthropic `yaml:"anthropic"`
 	Polling   Polling   `yaml:"polling"`
 	Replies   Replies   `yaml:"replies"`
+	Metrics   Metrics   `yaml:"metrics"`
+}
+
+type Metrics struct {
+	Enabled       bool   `yaml:"enabled"`
+	ListenAddress string `yaml:"listenAddress"`
+	Path          string `yaml:"path"`
 }
 
 type Replies struct {
@@ -125,6 +132,14 @@ func ValidateConfig(config *Config) error {
 	// Allow Codex without API keys; no additional validation needed beyond a command being present.
 	if config.Polling.IntervalSeconds == 0 {
 		return fmt.Errorf("polling.intervalSeconds is required")
+	}
+	if config.Metrics.Enabled {
+		if config.Metrics.ListenAddress == "" {
+			config.Metrics.ListenAddress = ":2112"
+		}
+		if config.Metrics.Path == "" {
+			config.Metrics.Path = "/metrics"
+		}
 	}
 
 	if config.Review.MaxPerReview == 0 {

@@ -10,6 +10,8 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/option"
 )
 
+const defaultMaxTokens = 4096
+
 type AnthropicConfig struct {
 	APIKey         string
 	Model          string
@@ -38,17 +40,7 @@ func NewAnthropicCompletion(ctx context.Context, cfg *AnthropicConfig) (*Anthrop
 }
 
 func (c *AnthropicCompletion) Completion(userPrompt, systemPrompt string) (string, error) {
-	ctx, cancel := context.WithTimeout(c.ctx, c.config.RequestTimeout)
-	defer cancel()
-
-	maxTokens := c.config.MaxTokens
-	if maxTokens <= 0 {
-		maxTokens = 4096
-	}
-
-	resp, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:     c.config.Model,
-		MaxTokens: int64(maxTokens),
+	return c.runCompletion(anthropic.MessageNewParams{
 		System: []anthropic.TextBlockParam{{
 			Text:         systemPrompt,
 			CacheControl: anthropic.NewCacheControlEphemeralParam(),
@@ -57,6 +49,39 @@ func (c *AnthropicCompletion) Completion(userPrompt, systemPrompt string) (strin
 			anthropic.NewUserMessage(anthropic.NewTextBlock(userPrompt)),
 		},
 	})
+}
+
+func (c *AnthropicCompletion) CompletionWithPrefixCache(userPromptPrefix, userPromptSuffix, systemPrompt string) (string, error) {
+	if strings.TrimSpace(userPromptPrefix) == "" {
+		return c.Completion(userPromptSuffix, systemPrompt)
+	}
+
+	return c.runCompletion(anthropic.MessageNewParams{
+		System: []anthropic.TextBlockParam{{
+			Text: systemPrompt,
+		}},
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(
+				anthropic.ContentBlockParamUnion{OfText: &anthropic.TextBlockParam{
+					Text:         userPromptPrefix,
+					CacheControl: anthropic.NewCacheControlEphemeralParam(),
+				}},
+				anthropic.ContentBlockParamUnion{OfText: &anthropic.TextBlockParam{
+					Text: userPromptSuffix,
+				}},
+			),
+		},
+	})
+}
+
+func (c *AnthropicCompletion) runCompletion(params anthropic.MessageNewParams) (string, error) {
+	ctx, cancel := context.WithTimeout(c.ctx, c.config.RequestTimeout)
+	defer cancel()
+
+	params.Model = c.config.Model
+	params.MaxTokens = int64(c.maxTokens())
+
+	resp, err := c.client.Messages.New(ctx, params)
 	if err != nil {
 		return "", fmt.Errorf("anthropic request failed: %w", err)
 	}
@@ -73,49 +98,10 @@ func (c *AnthropicCompletion) Completion(userPrompt, systemPrompt string) (strin
 	return "", fmt.Errorf("empty LLM response")
 }
 
-func (c *AnthropicCompletion) CompletionWithPrefixCache(userPromptPrefix, userPromptSuffix, systemPrompt string) (string, error) {
-	if strings.TrimSpace(userPromptPrefix) == "" {
-		return c.Completion(userPromptSuffix, systemPrompt)
+func (c *AnthropicCompletion) maxTokens() int {
+	if c.config.MaxTokens > 0 {
+		return c.config.MaxTokens
 	}
 
-	ctx, cancel := context.WithTimeout(c.ctx, c.config.RequestTimeout)
-	defer cancel()
-
-	maxTokens := c.config.MaxTokens
-	if maxTokens <= 0 {
-		maxTokens = 4096
-	}
-
-	resp, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:     c.config.Model,
-		MaxTokens: int64(maxTokens),
-		System: []anthropic.TextBlockParam{{
-			Text: systemPrompt,
-		}},
-		Messages: []anthropic.MessageParam{
-			anthropic.NewUserMessage(
-				anthropic.ContentBlockParamUnion{OfText: &anthropic.TextBlockParam{
-					Text:         userPromptPrefix,
-					CacheControl: anthropic.NewCacheControlEphemeralParam(),
-				}},
-				anthropic.ContentBlockParamUnion{OfText: &anthropic.TextBlockParam{
-					Text: userPromptSuffix,
-				}},
-			),
-		},
-	})
-	if err != nil {
-		return "", fmt.Errorf("anthropic request failed: %w", err)
-	}
-
-	for _, block := range resp.Content {
-		if tb, ok := block.AsAny().(anthropic.TextBlock); ok {
-			content := strings.TrimSpace(tb.Text)
-			if content != "" {
-				return content, nil
-			}
-		}
-	}
-
-	return "", fmt.Errorf("empty LLM response")
+	return defaultMaxTokens
 }

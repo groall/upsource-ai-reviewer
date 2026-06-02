@@ -10,6 +10,7 @@ import (
 
 	"github.com/groall/upsource-ai-reviewer/internal/git"
 	"github.com/groall/upsource-ai-reviewer/internal/llm"
+	"github.com/groall/upsource-ai-reviewer/internal/metrics"
 	"github.com/groall/upsource-ai-reviewer/pkg/config"
 	"github.com/groall/upsource-ai-reviewer/pkg/upsource"
 )
@@ -108,6 +109,7 @@ func (r *Reviewer) doReview(review *upsource.Review) ([]*llm.ReviewComment, erro
 	if err := upsource.AddReviewLabel(r.ctx, r.upsourceClient, review, r.config.Upsource.ReviewedLabel); err != nil {
 		return nil, fmt.Errorf("failed to add review label: %w", err)
 	}
+	metrics.DefaultRecorder.RecordReviewReviewed()
 
 	return comments, nil
 }
@@ -151,12 +153,14 @@ func (r *Reviewer) postComments(review *upsource.Review, comments []*llm.ReviewC
 		if err != nil {
 			return fmt.Errorf("failed to post inline comment to %s:%d -> %s: %w", comment.FilePath, comment.LineNumber, comment.Comment, err)
 		}
+		metrics.DefaultRecorder.RecordReviewCommentsPosted(1)
 	}
 
 	if len(postInOneComments) > 0 {
 		if err := r.createOneDiscussion(postInOneComments, review); err != nil {
 			return fmt.Errorf("failed to post comments to review %s: %w", review.GetBranch(), err)
 		}
+		metrics.DefaultRecorder.RecordReviewCommentsPosted(len(postInOneComments))
 	}
 
 	return nil

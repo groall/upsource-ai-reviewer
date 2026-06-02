@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"strings"
+
+	"github.com/groall/upsource-ai-reviewer/internal/metrics"
 )
 
 // CommentMsg is a single message in a thread transcript passed to the LLM.
@@ -40,24 +42,23 @@ func (c *Reviewer) Reply(thread []CommentMsg, codeContext string, anchorText str
 
 	log.Print("Sending reply prompt to LLM...")
 
-	var (
-		resp string
-		err  error
-	)
+	var replyText string
+	var err error
 	if prefix != "" {
 		if p, ok := c.llmProvider.(PrefixCacheProvider); ok {
-			resp, err = p.CompletionWithPrefixCache(prefix, suffix, c.config.Replies.SystemMessage)
+			replyText, err = p.CompletionWithPrefixCache(prefix, suffix, c.config.Replies.SystemMessage)
 		} else {
-			resp, err = c.llmProvider.Completion(userPrompt, c.config.Replies.SystemMessage)
+			replyText, err = c.complete(userPrompt, c.config.Replies.SystemMessage)
 		}
 	} else {
-		resp, err = c.llmProvider.Completion(userPrompt, c.config.Replies.SystemMessage)
+		replyText, err = c.complete(userPrompt, c.config.Replies.SystemMessage)
 	}
 	if err != nil {
+		metrics.DefaultRecorder.RecordLLMError(metrics.OperationReply, c.config)
 		return nil, fmt.Errorf("LLM reply request failed: %w", err)
 	}
 
-	reply := strings.TrimSpace(resp)
+	reply := strings.TrimSpace(replyText)
 
 	if reply == "" {
 		return nil, errors.New("LLM chose silence for discussion")
@@ -87,7 +88,7 @@ func formatThread(thread []CommentMsg) string {
 		if i > 0 {
 			b.WriteString("\n\n")
 		}
-		fmt.Fprintf(&b, "%s (%s):\n%s", role, m.Author, m.Text)
+		_, _ = fmt.Fprintf(&b, "%s (%s):\n%s", role, m.Author, m.Text)
 	}
 
 	return b.String()

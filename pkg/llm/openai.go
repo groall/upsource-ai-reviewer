@@ -42,32 +42,10 @@ func NewOpenAICompletion(ctx context.Context, cfg *OpenAIConfig) (*OpenAIComplet
 
 // Completion calls OpenAI Chat Completion API.
 func (c *OpenAICompletion) Completion(userPrompt, systemPrompt string) (string, error) {
-	ctx, cancel := context.WithTimeout(c.ctx, c.config.RequestTimeout)
-	defer cancel()
-
-	resp, err := c.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
-		Model:               c.config.Model,
-		MaxCompletionTokens: c.config.MaxTokens,
-		Temperature:         c.config.Temperature,
-		Messages: []openai.ChatCompletionMessage{
-			{Role: openai.ChatMessageRoleSystem, Content: systemPrompt},
-			{Role: openai.ChatMessageRoleUser, Content: userPrompt},
-		},
+	return c.runCompletion([]openai.ChatCompletionMessage{
+		{Role: openai.ChatMessageRoleSystem, Content: systemPrompt},
+		{Role: openai.ChatMessageRoleUser, Content: userPrompt},
 	})
-	if err != nil {
-		return "", fmt.Errorf("OpenAI request failed: %w", err)
-	}
-	if len(resp.Choices) == 0 {
-		return "", fmt.Errorf("no choices in OpenAI response")
-	}
-
-	content := strings.TrimSpace(resp.Choices[0].Message.Content)
-
-	if content == "" {
-		return "", fmt.Errorf("empty LLM response")
-	}
-
-	return content, nil
 }
 
 // CompletionWithPrefixCache is best-effort prompt prefix caching for OpenAI.
@@ -80,6 +58,14 @@ func (c *OpenAICompletion) CompletionWithPrefixCache(userPromptPrefix, userPromp
 		return c.Completion(userPromptSuffix, systemPrompt)
 	}
 
+	return c.runCompletion([]openai.ChatCompletionMessage{
+		{Role: openai.ChatMessageRoleSystem, Content: systemPrompt},
+		{Role: openai.ChatMessageRoleUser, Content: userPromptPrefix},
+		{Role: openai.ChatMessageRoleUser, Content: userPromptSuffix},
+	})
+}
+
+func (c *OpenAICompletion) runCompletion(messages []openai.ChatCompletionMessage) (string, error) {
 	ctx, cancel := context.WithTimeout(c.ctx, c.config.RequestTimeout)
 	defer cancel()
 
@@ -87,11 +73,7 @@ func (c *OpenAICompletion) CompletionWithPrefixCache(userPromptPrefix, userPromp
 		Model:               c.config.Model,
 		MaxCompletionTokens: c.config.MaxTokens,
 		Temperature:         c.config.Temperature,
-		Messages: []openai.ChatCompletionMessage{
-			{Role: openai.ChatMessageRoleSystem, Content: systemPrompt},
-			{Role: openai.ChatMessageRoleUser, Content: userPromptPrefix},
-			{Role: openai.ChatMessageRoleUser, Content: userPromptSuffix},
-		},
+		Messages:            messages,
 	})
 	if err != nil {
 		return "", fmt.Errorf("OpenAI request failed: %w", err)
@@ -101,6 +83,7 @@ func (c *OpenAICompletion) CompletionWithPrefixCache(userPromptPrefix, userPromp
 	}
 
 	content := strings.TrimSpace(resp.Choices[0].Message.Content)
+
 	if content == "" {
 		return "", fmt.Errorf("empty LLM response")
 	}

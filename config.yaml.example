@@ -4,6 +4,11 @@
 polling:
   intervalSeconds: 60  # How often to check for new reviews
 
+metrics:
+  enabled: true
+  listenAddress: ":2112"
+  path: "/metrics"
+
 replies:
   enabled: true            # Reply to humans who responded in threads the bot started
   maxPerThread: 3          # Hard cap on bot replies per thread
