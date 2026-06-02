@@ -5,8 +5,9 @@ import (
 	"strings"
 )
 
-// validateCommentsAgainstDiff checks whether the reported line numbers exist in the provided diff.
-// If a line is not found, lineVerified is set to false and the line number is zeroed.
+// validateCommentsAgainstDiff checks whether each LLM-reported location points at
+// an added line in the provided unified diff. Comments that cannot be placed
+// inline are downgraded by clearing LineVerified and zeroing LineNumber.
 func validateCommentsAgainstDiff(diff string, comments []*ReviewComment) []*ReviewComment {
 	if diff == "" || len(comments) == 0 {
 		return comments
@@ -42,6 +43,7 @@ func buildNewFileLineIndex(diff string) map[string]map[int]bool {
 	var currentFile string
 	var newLine int
 
+	// Hunk headers carry the starting line number for the new side of the diff.
 	hunkHeader := regexp.MustCompile(`@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@`)
 
 	lines := strings.Split(diff, "\n")
@@ -76,6 +78,7 @@ func buildNewFileLineIndex(diff string) map[string]map[int]bool {
 
 			switch line[0] {
 			case '+':
+				// Only added lines are considered safe targets for inline comments.
 				if _, ok := result[currentFile]; !ok {
 					result[currentFile] = make(map[int]bool)
 				}
@@ -84,7 +87,7 @@ func buildNewFileLineIndex(diff string) map[string]map[int]bool {
 			case ' ':
 				newLine++
 			case '-':
-				// Removed lines do not advance new file line numbers.
+				// Removed lines belong only to the old side of the diff.
 			}
 		}
 	}
@@ -92,6 +95,7 @@ func buildNewFileLineIndex(diff string) map[string]map[int]bool {
 	return result
 }
 
+// normalizeDiffPath converts unified diff paths to repository-relative paths.
 func normalizeDiffPath(path string) string {
 	path = strings.TrimSpace(path)
 	path = strings.TrimPrefix(path, "a/")
