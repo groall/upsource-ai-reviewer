@@ -59,13 +59,13 @@ func (c *Reviewer) Reply(thread []CommentMsg, codeContext string, anchorText str
 	}
 
 	reply := strings.TrimSpace(replyText)
-
-	if reply == "" {
+	extracted := parseLLMDiscissionReply(reply)
+	if extracted == "" {
 		return nil, errors.New("LLM chose silence for discussion")
 	}
 
 	var result ReplyResult
-	if err := json.Unmarshal([]byte(reply), &result); err != nil {
+	if err := json.Unmarshal([]byte(extracted), &result); err != nil {
 		return nil, fmt.Errorf("failed to parse LLM reply for discussion: %w", err)
 	}
 
@@ -92,4 +92,14 @@ func formatThread(thread []CommentMsg) string {
 	}
 
 	return b.String()
+}
+
+func parseLLMDiscissionReply(content string) string {
+	start := strings.Index(content, "{")
+	end := strings.LastIndex(content, "}")
+	if start != -1 && end != -1 && end > start {
+		return content[start : end+1]
+	}
+
+	return ""
 }

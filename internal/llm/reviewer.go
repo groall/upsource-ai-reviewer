@@ -66,11 +66,11 @@ func (c *Reviewer) complete(userPrompt, systemPrompt string) (string, error) {
 // processAndPostLLMResponse processes the LLM response and returns the review comments.
 func processAndPostLLMResponse(llmResponse string) ([]*ReviewComment, error) {
 	// Try to extract JSON from the assistant content
-	llmResponse = parseLLMDecision(llmResponse)
+	extracted := parseLLMReviewComments(llmResponse)
 
 	var comments []*ReviewComment
 	// Unmarshal the JSON response from the LLM
-	if err := json.Unmarshal([]byte(llmResponse), &comments); err != nil {
+	if err := json.Unmarshal([]byte(extracted), &comments); err != nil {
 		return nil, fmt.Errorf("failed to parse LLM JSON response: %w", err)
 	}
 
@@ -83,8 +83,8 @@ func processAndPostLLMResponse(llmResponse string) ([]*ReviewComment, error) {
 
 }
 
-// parseLLMDecision extracts the JSON response from the LLM assistant content.
-func parseLLMDecision(content string) string {
+// parseLLMReviewComments extracts the JSON response from the LLM assistant content.
+func parseLLMReviewComments(content string) string {
 	// Try to extract JSON from the assistant content
 	// find first '{' and last '}'
 	start := strings.Index(content, "[")
