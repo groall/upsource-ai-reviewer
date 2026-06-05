@@ -9,6 +9,8 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const unknownLLMProvider = "unknown"
+
 type Config struct {
 	Upsource  Upsource  `yaml:"upsource"`
 	Gitlab    Gitlab    `yaml:"gitlab"`
@@ -104,6 +106,10 @@ func LoadConfig(filename string) (*Config, error) {
 	return config, nil
 }
 
+func (c *Config) AgentEnabled() bool {
+	return strings.TrimSpace(c.Agent.Command) != ""
+}
+
 func ValidateConfig(config *Config) error {
 	if config.Upsource.BaseURL == "" {
 		return fmt.Errorf("upsource.baseUrl is required")
@@ -126,7 +132,7 @@ func ValidateConfig(config *Config) error {
 	if config.Gitlab.AccessToken == "" {
 		return fmt.Errorf("gitlab.accessToken is required")
 	}
-	if config.OpenAI.APIKey == "" && config.Gemini.APIKey == "" && config.Agent.Command == "" && config.Anthropic.APIKey == "" {
+	if config.ActiveLLMProvider() == unknownLLMProvider {
 		return fmt.Errorf("either openai.apiKey, gemini.apiKey, anthropic.apiKey, or agent.command is required")
 	}
 	// Allow Codex without API keys; no additional validation needed beyond a command being present.
@@ -175,6 +181,26 @@ func ValidateConfig(config *Config) error {
 	}
 
 	return nil
+}
+
+func (c *Config) ActiveLLMProvider() string {
+	if c == nil {
+		return unknownLLMProvider
+	}
+	if c.AgentEnabled() {
+		return "agent"
+	}
+	if c.OpenAI.APIKey != "" {
+		return "openai"
+	}
+	if c.Gemini.APIKey != "" {
+		return "gemini"
+	}
+	if c.Anthropic.APIKey != "" {
+		return "anthropic"
+	}
+
+	return unknownLLMProvider
 }
 
 func containsFmtError(s string) bool {

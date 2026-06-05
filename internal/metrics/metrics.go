@@ -124,20 +124,8 @@ func (prometheusRecorder) RecordLLMError(operation string, cfg *config.Config) {
 }
 
 func currentLLMProvider(cfg *config.Config) string {
-	if cfg == nil {
-		return "unknown"
-	}
-	if cfg.Agent.Command != "" {
-		return "agent"
-	}
-	if cfg.OpenAI.APIKey != "" {
-		return "openai"
-	}
-	if cfg.Gemini.APIKey != "" {
-		return "gemini"
-	}
-	if cfg.Anthropic.APIKey != "" {
-		return "anthropic"
+	if cfg != nil {
+		return cfg.ActiveLLMProvider()
 	}
 
 	return "unknown"

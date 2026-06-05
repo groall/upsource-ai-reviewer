@@ -4,6 +4,12 @@
 polling:
   intervalSeconds: 60  # How often to check for new reviews
 
+# Provider selection priority:
+# 1) agent.command (if set)
+# 2) openai.apiKey
+# 3) gemini.apiKey
+# 4) anthropic.apiKey
+
 metrics:
   enabled: true
   listenAddress: ":2112"
