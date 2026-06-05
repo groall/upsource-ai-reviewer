@@ -54,7 +54,7 @@ func (c *Reviewer) Reply(thread []CommentMsg, codeContext string, anchorText str
 		replyText, err = c.complete(userPrompt, c.config.Replies.SystemMessage)
 	}
 	if err != nil {
-		metrics.DefaultRecorder.RecordLLMError(metrics.OperationReply, c.config)
+		metrics.DefaultRecorder.RecordLLMError(metrics.OperationReply, c.config.Providers.ActiveLLMProvider())
 		return nil, fmt.Errorf("LLM reply request failed: %w", err)
 	}
 

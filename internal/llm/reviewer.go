@@ -44,7 +44,7 @@ func (c *Reviewer) Do(changes string, commitsComments string) ([]*ReviewComment,
 
 	llmResponse, err := c.complete(prompt, systemMessage)
 	if err != nil {
-		metrics.DefaultRecorder.RecordLLMError(metrics.OperationReview, c.config)
+		metrics.DefaultRecorder.RecordLLMError(metrics.OperationReview, c.config.Providers.ActiveLLMProvider())
 		return nil, fmt.Errorf("LLM request failed: %w", err)
 	}
 	log.Printf("Received LLM response: %s\n", llmResponse)

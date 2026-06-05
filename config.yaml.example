@@ -5,10 +5,10 @@ polling:
   intervalSeconds: 60  # How often to check for new reviews
 
 # Provider selection priority:
-# 1) agent.command (if set)
-# 2) openai.apiKey
-# 3) gemini.apiKey
-# 4) anthropic.apiKey
+# 1) providers.agent.command (if set)
+# 2) providers.openai.apiKey
+# 3) providers.gemini.apiKey
+# 4) providers.anthropic.apiKey
 
 metrics:
   enabled: true
@@ -66,30 +66,31 @@ replies:
     3. Consider code valid only if the original review concern is fully addressed.
 
 
-gemini:
-#  apiKey: "***"
-  model: "gemini-2.5-flash"
-  maxTokens: 0
+providers:
+  gemini:
+#    apiKey: "***"
+    model: "gemini-2.5-flash"
+    maxTokens: 0
 
-# OpenAI settings
-openai:
-  endpoint: "https://api.openai.com/v1/chat/completions"
-  apiKey: "sk-proj-****"
-  model: "gpt-5-mini"
-  maxTokens: 0
-  temperature: 0
-  requestTimeout: 300s
+  # OpenAI settings
+  openai:
+    endpoint: "https://api.openai.com/v1/chat/completions"
+    apiKey: "sk-proj-****"
+    model: "gpt-5-mini"
+    maxTokens: 0
+    temperature: 0
+    requestTimeout: 300s
 
-anthropic:
-#  apiKey: "sk-ant-****"
-  model: "claude-opus-4-7"
-  maxTokens: 0
-  requestTimeout: 300s
+  anthropic:
+#    apiKey: "sk-ant-****"
+    model: "claude-opus-4-7"
+    maxTokens: 0
+    requestTimeout: 300s
 
-agent:
-#  command: "/usr/bin/codex exec -" # Command that reads prompt from stdin and writes response to stdout
-#  workdir: "" # optional working directory for the Codex command
-#  requestTimeout: 300s
+  agent:
+#    command: "/usr/bin/codex exec -" # Command that reads prompt from stdin and writes response to stdout
+#    workdir: "" # optional working directory for the Codex command
+#    requestTimeout: 300s
 
 upsource:
   baseUrl: "https://upsource.com"

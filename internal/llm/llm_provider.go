@@ -24,33 +24,33 @@ type PrefixCacheProvider interface {
 }
 
 type providerFactory interface {
-	Enabled(cfg *config.Config) bool
-	Build(ctx context.Context, cfg *config.Config) (Provider, error)
+	Enabled(providers config.Providers) bool
+	Build(ctx context.Context, providers config.Providers) (Provider, error)
 }
 
 type orderedProviderFactory struct {
-	enabled func(cfg *config.Config) bool
-	build   func(ctx context.Context, cfg *config.Config) (Provider, error)
+	enabled func(providers config.Providers) bool
+	build   func(ctx context.Context, providers config.Providers) (Provider, error)
 }
 
-func (f orderedProviderFactory) Enabled(cfg *config.Config) bool {
-	return f.enabled(cfg)
+func (f orderedProviderFactory) Enabled(providers config.Providers) bool {
+	return f.enabled(providers)
 }
 
-func (f orderedProviderFactory) Build(ctx context.Context, cfg *config.Config) (Provider, error) {
-	return f.build(ctx, cfg)
+func (f orderedProviderFactory) Build(ctx context.Context, providers config.Providers) (Provider, error) {
+	return f.build(ctx, providers)
 }
 
 var providerFactories = []providerFactory{
 	orderedProviderFactory{
-		enabled: func(cfg *config.Config) bool {
-			return cfg.AgentEnabled()
+		enabled: func(providers config.Providers) bool {
+			return providers.AgentEnabled()
 		},
-		build: func(ctx context.Context, cfg *config.Config) (Provider, error) {
+		build: func(ctx context.Context, providers config.Providers) (Provider, error) {
 			provider, err := pkgllm.NewAgentCompletion(ctx, &pkgllm.AgentConfig{
-				Command:        cfg.Agent.Command,
-				Workdir:        cfg.Agent.Workdir,
-				RequestTimeout: cfg.Agent.RequestTimeout,
+				Command:        providers.Agent.Command,
+				Workdir:        providers.Agent.Workdir,
+				RequestTimeout: providers.Agent.RequestTimeout,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("failed to create Agent client: %w", err)
@@ -59,17 +59,17 @@ var providerFactories = []providerFactory{
 		},
 	},
 	orderedProviderFactory{
-		enabled: func(cfg *config.Config) bool {
-			return cfg.OpenAI.APIKey != ""
+		enabled: func(providers config.Providers) bool {
+			return providers.OpenAI.APIKey != ""
 		},
-		build: func(ctx context.Context, cfg *config.Config) (Provider, error) {
+		build: func(ctx context.Context, providers config.Providers) (Provider, error) {
 			provider, err := pkgllm.NewOpenAICompletion(ctx, &pkgllm.OpenAIConfig{
-				APIKey:         cfg.OpenAI.APIKey,
-				Endpoint:       cfg.OpenAI.Endpoint,
-				Model:          cfg.OpenAI.Model,
-				MaxTokens:      cfg.OpenAI.MaxTokens,
-				Temperature:    float32(cfg.OpenAI.Temperature),
-				RequestTimeout: cfg.OpenAI.RequestTimeout,
+				APIKey:         providers.OpenAI.APIKey,
+				Endpoint:       providers.OpenAI.Endpoint,
+				Model:          providers.OpenAI.Model,
+				MaxTokens:      providers.OpenAI.MaxTokens,
+				Temperature:    float32(providers.OpenAI.Temperature),
+				RequestTimeout: providers.OpenAI.RequestTimeout,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("failed to create OpenAI client: %w", err)
@@ -78,14 +78,14 @@ var providerFactories = []providerFactory{
 		},
 	},
 	orderedProviderFactory{
-		enabled: func(cfg *config.Config) bool {
-			return cfg.Gemini.APIKey != ""
+		enabled: func(providers config.Providers) bool {
+			return providers.Gemini.APIKey != ""
 		},
-		build: func(ctx context.Context, cfg *config.Config) (Provider, error) {
+		build: func(ctx context.Context, providers config.Providers) (Provider, error) {
 			provider, err := pkgllm.NewGeminiCompletion(ctx, &pkgllm.GeminiConfig{
-				APIKey:    cfg.Gemini.APIKey,
-				Model:     cfg.Gemini.Model,
-				MaxTokens: int32(cfg.Gemini.MaxTokens),
+				APIKey:    providers.Gemini.APIKey,
+				Model:     providers.Gemini.Model,
+				MaxTokens: int32(providers.Gemini.MaxTokens),
 			})
 			if err != nil {
 				return nil, fmt.Errorf("failed to create Gemini client: %w", err)
@@ -94,15 +94,15 @@ var providerFactories = []providerFactory{
 		},
 	},
 	orderedProviderFactory{
-		enabled: func(cfg *config.Config) bool {
-			return cfg.Anthropic.APIKey != ""
+		enabled: func(providers config.Providers) bool {
+			return providers.Anthropic.APIKey != ""
 		},
-		build: func(ctx context.Context, cfg *config.Config) (Provider, error) {
+		build: func(ctx context.Context, providers config.Providers) (Provider, error) {
 			provider, err := pkgllm.NewAnthropicCompletion(ctx, &pkgllm.AnthropicConfig{
-				APIKey:         cfg.Anthropic.APIKey,
-				Model:          cfg.Anthropic.Model,
-				MaxTokens:      cfg.Anthropic.MaxTokens,
-				RequestTimeout: cfg.Anthropic.RequestTimeout,
+				APIKey:         providers.Anthropic.APIKey,
+				Model:          providers.Anthropic.Model,
+				MaxTokens:      providers.Anthropic.MaxTokens,
+				RequestTimeout: providers.Anthropic.RequestTimeout,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("failed to create Anthropic client: %w", err)
@@ -114,12 +114,14 @@ var providerFactories = []providerFactory{
 
 // createLLMProvider creates an LLM provider based on the configuration.
 func createLLMProvider(ctx context.Context, cfg *config.Config) (Provider, error) {
+	providers := cfg.Providers
+
 	for _, factory := range providerFactories {
-		if !factory.Enabled(cfg) {
+		if !factory.Enabled(providers) {
 			continue
 		}
 
-		provider, err := factory.Build(ctx, cfg)
+		provider, err := factory.Build(ctx, providers)
 		if err != nil {
 			return nil, err
 		}

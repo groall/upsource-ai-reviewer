@@ -26,12 +26,16 @@ func TestRecordLLMError(t *testing.T) {
 	reviewErrorsBefore := counterValue(t, reviewErrors)
 	replyErrorsBefore := counterValue(t, replyErrors)
 
-	DefaultRecorder.RecordLLMError(OperationReview, &config.Config{
-		Agent: config.Agent{Command: "codex exec -"},
-	})
-	DefaultRecorder.RecordLLMError(OperationReply, &config.Config{
-		OpenAI: config.OpenAI{APIKey: "key"},
-	})
+	DefaultRecorder.RecordLLMError(
+		OperationReview,
+		(&config.Providers{
+			Agent: config.Agent{Command: "codex exec -"},
+		}).ActiveLLMProvider())
+	DefaultRecorder.RecordLLMError(
+		OperationReply,
+		(&config.Providers{
+			OpenAI: config.OpenAI{APIKey: "key"},
+		}).ActiveLLMProvider())
 
 	require.Equal(t, reviewErrorsBefore+1, counterValue(t, reviewErrors))
 	require.Equal(t, replyErrorsBefore+1, counterValue(t, replyErrors))

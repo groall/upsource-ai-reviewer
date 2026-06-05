@@ -23,7 +23,7 @@ type Recorder interface {
 	RecordReviewReviewed()
 	RecordReplySent()
 	RecordReviewCommentsPosted(count int)
-	RecordLLMError(operation string, cfg *config.Config)
+	RecordLLMError(operation, currentProvider string)
 }
 
 type prometheusRecorder struct{}
@@ -119,14 +119,6 @@ func (prometheusRecorder) RecordReviewCommentsPosted(count int) {
 	reviewCommentsTotal.Add(float64(count))
 }
 
-func (prometheusRecorder) RecordLLMError(operation string, cfg *config.Config) {
-	llmErrorsTotal.WithLabelValues(currentLLMProvider(cfg), operation).Inc()
-}
-
-func currentLLMProvider(cfg *config.Config) string {
-	if cfg != nil {
-		return cfg.ActiveLLMProvider()
-	}
-
-	return "unknown"
+func (prometheusRecorder) RecordLLMError(operation, currentProvider string) {
+	llmErrorsTotal.WithLabelValues(currentProvider, operation).Inc()
 }
