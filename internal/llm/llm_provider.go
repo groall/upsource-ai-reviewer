@@ -25,14 +25,14 @@ type PrefixCacheProvider interface {
 
 // createLLMProvider creates an LLM provider based on the configuration.
 func createLLMProvider(ctx context.Context, cfg *config.Config) (Provider, error) {
-	if cfg.Codex.Command != "" {
-		provider, err := pkgllm.NewCodexCompletion(ctx, &pkgllm.CodexConfig{
-			Command:        cfg.Codex.Command,
-			Workdir:        cfg.Codex.Workdir,
-			RequestTimeout: cfg.Codex.RequestTimeout,
+	if cfg.Agent.Command != "" {
+		provider, err := pkgllm.NewAgentCompletion(ctx, &pkgllm.AgentConfig{
+			Command:        cfg.Agent.Command,
+			Workdir:        cfg.Agent.Workdir,
+			RequestTimeout: cfg.Agent.RequestTimeout,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to create Codex client: %w", err)
+			return nil, fmt.Errorf("failed to create Agent client: %w", err)
 		}
 		return provider, nil
 	}

@@ -27,7 +27,7 @@ func TestRecordLLMError(t *testing.T) {
 	replyErrorsBefore := counterValue(t, replyErrors)
 
 	DefaultRecorder.RecordLLMError(OperationReview, &config.Config{
-		Codex: config.Codex{Command: "codex exec -"},
+		Agent: config.Agent{Command: "codex exec -"},
 	})
 	DefaultRecorder.RecordLLMError(OperationReply, &config.Config{
 		OpenAI: config.OpenAI{APIKey: "key"},

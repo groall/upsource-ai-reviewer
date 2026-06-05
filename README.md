@@ -2,7 +2,7 @@
 
 ## Description
 
-Upsource AI Reviewer is a Go application that automatically reviews code changes in Upsource using AI models from OpenAI, Gemini, Anthropic, or a local Codex command. It fetches code reviews from Upsource, generates review comments using an AI model, and posts them back to Upsource.
+Upsource AI Reviewer is a Go application that automatically reviews code changes in Upsource using AI models from OpenAI, Gemini, Anthropic, or a local agent command(e.g. Codex). It fetches code reviews from Upsource, generates review comments using an AI model, and posts them back to Upsource.
 
 In addition, when `replies.enabled` is set, the bot scans the discussions it previously authored and posts a threaded follow-up whenever a human commented after its last word. A per-thread cap (`replies.maxPerThread`) prevents runaway loops, and an empty LLM response is treated as a deliberate "stay silent".
 
@@ -13,7 +13,7 @@ In addition, when `replies.enabled` is set, the bot scans the discussions it pre
 - Go 1.2x installed
 - Access to an Upsource instance
 - Access to a GitLab instance
-- An API key from OpenAI, Google Gemini, or Anthropic (or a Codex command)
+- An API key from OpenAI, Google Gemini, or Anthropic (or an agent command)
 
 ### Installation
 

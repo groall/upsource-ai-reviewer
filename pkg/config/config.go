@@ -13,8 +13,8 @@ type Config struct {
 	Upsource  Upsource  `yaml:"upsource"`
 	Gitlab    Gitlab    `yaml:"gitlab"`
 	Review    Review    `yaml:"review"`
+	Agent     Agent     `yaml:"agent"`
 	OpenAI    OpenAI    `yaml:"openai"`
-	Codex     Codex     `yaml:"codex"`
 	Gemini    Gemini    `yaml:"gemini"`
 	Anthropic Anthropic `yaml:"anthropic"`
 	Polling   Polling   `yaml:"polling"`
@@ -75,7 +75,7 @@ type OpenAI struct {
 	RequestTimeout time.Duration `yaml:"requestTimeout"`
 }
 
-type Codex struct {
+type Agent struct {
 	Command        string        `yaml:"command"`
 	Workdir        string        `yaml:"workdir"`
 	RequestTimeout time.Duration `yaml:"requestTimeout"`
@@ -126,8 +126,8 @@ func ValidateConfig(config *Config) error {
 	if config.Gitlab.AccessToken == "" {
 		return fmt.Errorf("gitlab.accessToken is required")
 	}
-	if config.OpenAI.APIKey == "" && config.Gemini.APIKey == "" && config.Codex.Command == "" && config.Anthropic.APIKey == "" {
-		return fmt.Errorf("either openai.apiKey, gemini.apiKey, anthropic.apiKey, or codex.command is required")
+	if config.OpenAI.APIKey == "" && config.Gemini.APIKey == "" && config.Agent.Command == "" && config.Anthropic.APIKey == "" {
+		return fmt.Errorf("either openai.apiKey, gemini.apiKey, anthropic.apiKey, or agent.command is required")
 	}
 	// Allow Codex without API keys; no additional validation needed beyond a command being present.
 	if config.Polling.IntervalSeconds == 0 {

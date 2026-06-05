@@ -52,23 +52,23 @@ config.yaml.example            reference configuration
 
 ## LLM Provider Selection
 
-Priority order in `createLLMProvider()`: **Codex → OpenAI → Gemini → Anthropic**.
+Priority order in `createLLMProvider()`: **Agent → OpenAI → Gemini → Anthropic**.
 Only one provider is active per run, determined by which API key / command is set.
 At least one must be configured or startup fails.
 
 ## Configuration Overview
 
-| Section | Key fields |
-|---|---|
-| `polling` | `intervalSeconds` |
-| `review` | `maxPerReview`, `postInLine` (high / mid / low / none), `systemMessage`, `userPromptTemplate` |
-| `upsource` | `baseUrl`, `username`, `password`, `query`, `reviewedLabel`, `invitationLabel` |
-| `gitlab` | `baseUrl`, `accessToken` |
-| `openai` | `apiKey`, `endpoint`, `model`, `maxTokens`, `temperature`, `requestTimeout` |
-| `gemini` | `apiKey`, `model`, `maxTokens` |
+| Section     | Key fields |
+|-------------|---|
+| `polling`   | `intervalSeconds` |
+| `review`    | `maxPerReview`, `postInLine` (high / mid / low / none), `systemMessage`, `userPromptTemplate` |
+| `upsource`  | `baseUrl`, `username`, `password`, `query`, `reviewedLabel`, `invitationLabel` |
+| `gitlab`    | `baseUrl`, `accessToken` |
+| `openai`    | `apiKey`, `endpoint`, `model`, `maxTokens`, `temperature`, `requestTimeout` |
+| `gemini`    | `apiKey`, `model`, `maxTokens` |
 | `anthropic` | `apiKey`, `model`, `maxTokens`, `requestTimeout` |
-| `codex` | `command`, `workdir`, `requestTimeout` |
-| `replies` | `enabled`, `maxPerThread`, `systemMessage` |
+| `agent`     | `command`, `workdir`, `requestTimeout` |
+| `replies`   | `enabled`, `maxPerThread`, `systemMessage` |
 
 ## Review Flow
 

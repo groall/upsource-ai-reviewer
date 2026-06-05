@@ -80,7 +80,7 @@ anthropic:
   maxTokens: 0
   requestTimeout: 300s
 
-codex:
+agent:
 #  command: "/usr/bin/codex exec -" # Command that reads prompt from stdin and writes response to stdout
 #  workdir: "" # optional working directory for the Codex command
 #  requestTimeout: 300s

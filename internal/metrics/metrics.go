@@ -50,7 +50,7 @@ var (
 )
 
 func init() {
-	for _, provider := range []string{"codex", "openai", "gemini", "anthropic"} {
+	for _, provider := range []string{"agent", "openai", "gemini", "anthropic"} {
 		for _, operation := range []string{OperationReview, OperationReply} {
 			llmErrorsTotal.WithLabelValues(provider, operation)
 		}
@@ -127,8 +127,8 @@ func currentLLMProvider(cfg *config.Config) string {
 	if cfg == nil {
 		return "unknown"
 	}
-	if cfg.Codex.Command != "" {
-		return "codex"
+	if cfg.Agent.Command != "" {
+		return "agent"
 	}
 	if cfg.OpenAI.APIKey != "" {
 		return "openai"
