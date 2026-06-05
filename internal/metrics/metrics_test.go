@@ -20,7 +20,7 @@ func TestRecordReviewCommentsPosted(t *testing.T) {
 }
 
 func TestRecordLLMError(t *testing.T) {
-	reviewErrors := llmErrorsTotal.WithLabelValues("codex", OperationReview)
+	reviewErrors := llmErrorsTotal.WithLabelValues("agent", OperationReview)
 	replyErrors := llmErrorsTotal.WithLabelValues("openai", OperationReply)
 
 	reviewErrorsBefore := counterValue(t, reviewErrors)

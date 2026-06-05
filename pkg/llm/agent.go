@@ -22,11 +22,11 @@ type AgentCompletion struct {
 
 func NewAgentCompletion(ctx context.Context, cfg *AgentConfig) (*AgentCompletion, error) {
 	if cfg == nil {
-		return nil, fmt.Errorf("command config is required")
+		return nil, fmt.Errorf("agent config is required")
 	}
 
 	if strings.TrimSpace(cfg.Command) == "" {
-		return nil, fmt.Errorf("a command is required")
+		return nil, fmt.Errorf("command is required")
 	}
 
 	return &AgentCompletion{
