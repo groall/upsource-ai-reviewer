@@ -47,6 +47,10 @@ func (c *Reviewer) Reply(thread []CommentMsg, codeContext string, anchorText str
 	if prefix != "" {
 		if p, ok := c.llmProvider.(PrefixCacheProvider); ok {
 			replyText, err = p.CompletionWithPrefixCache(prefix, suffix, c.config.Replies.SystemMessage)
+			if err != nil {
+				log.Printf("Prefix-cache reply failed, retrying without prefix cache: %v", err)
+				replyText, err = c.complete(userPrompt, c.config.Replies.SystemMessage)
+			}
 		} else {
 			replyText, err = c.complete(userPrompt, c.config.Replies.SystemMessage)
 		}
