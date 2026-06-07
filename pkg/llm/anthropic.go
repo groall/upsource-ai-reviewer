@@ -75,7 +75,7 @@ func (c *AnthropicCompletion) CompletionWithPrefixCache(userPromptPrefix, userPr
 }
 
 func (c *AnthropicCompletion) runCompletion(params anthropic.MessageNewParams) (string, error) {
-	ctx, cancel := context.WithTimeout(c.ctx, c.config.RequestTimeout)
+	ctx, cancel := withRequestTimeout(c.ctx, c.config.RequestTimeout)
 	defer cancel()
 
 	params.Model = c.config.Model

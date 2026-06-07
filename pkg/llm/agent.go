@@ -37,12 +37,8 @@ func NewAgentCompletion(ctx context.Context, cfg *AgentConfig) (*AgentCompletion
 
 // Completion executes a local CLI command, piping the prompts via STDIN.
 func (c *AgentCompletion) Completion(userPrompt, systemPrompt string) (string, error) {
-	execCtx := c.ctx
-	if c.config.RequestTimeout > 0 {
-		var cancel context.CancelFunc
-		execCtx, cancel = context.WithTimeout(execCtx, c.config.RequestTimeout)
-		defer cancel()
-	}
+	execCtx, cancel := withRequestTimeout(c.ctx, c.config.RequestTimeout)
+	defer cancel()
 
 	combinedPrompt := strings.TrimSpace(systemPrompt + "\n\n" + userPrompt)
 

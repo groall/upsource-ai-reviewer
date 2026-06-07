@@ -71,6 +71,7 @@ providers:
 #    apiKey: "***"
     model: "gemini-2.5-flash"
     maxTokens: 0
+    requestTimeout: 300s
 
   # OpenAI settings
   openai:

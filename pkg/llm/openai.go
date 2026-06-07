@@ -66,7 +66,7 @@ func (c *OpenAICompletion) CompletionWithPrefixCache(userPromptPrefix, userPromp
 }
 
 func (c *OpenAICompletion) runCompletion(messages []openai.ChatCompletionMessage) (string, error) {
-	ctx, cancel := context.WithTimeout(c.ctx, c.config.RequestTimeout)
+	ctx, cancel := withRequestTimeout(c.ctx, c.config.RequestTimeout)
 	defer cancel()
 
 	resp, err := c.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
@@ -96,7 +96,7 @@ func (c *OpenAICompletion) runCompletion(messages []openai.ChatCompletionMessage
 // - trims any path after "/v1/" if a full endpoint URL was provided
 func normalizeOpenAIBaseURL(endpoint string) string {
 	if endpoint == "" {
-		return ""
+		return openai.DefaultConfig("").BaseURL
 	}
 
 	e := strings.TrimRight(endpoint, "/")

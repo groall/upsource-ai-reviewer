@@ -152,19 +152,19 @@ func TestValidateConfig(t *testing.T) {
 
 	t.Run("allows openai provider", func(t *testing.T) {
 		cfg := validConfig()
-		cfg.Providers = Providers{OpenAI: OpenAI{APIKey: "openai"}}
+		cfg.Providers = Providers{OpenAI: OpenAI{APIKey: "openai", Model: "gpt-5-mini"}}
 		require.NoError(t, ValidateConfig(cfg))
 	})
 
 	t.Run("allows gemini provider", func(t *testing.T) {
 		cfg := validConfig()
-		cfg.Providers = Providers{Gemini: Gemini{APIKey: "gemini"}}
+		cfg.Providers = Providers{Gemini: Gemini{APIKey: "gemini", Model: "gemini-2.5-flash"}}
 		require.NoError(t, ValidateConfig(cfg))
 	})
 
 	t.Run("allows anthropic provider", func(t *testing.T) {
 		cfg := validConfig()
-		cfg.Providers = Providers{Anthropic: Anthropic{APIKey: "anthropic"}}
+		cfg.Providers = Providers{Anthropic: Anthropic{APIKey: "anthropic", Model: "claude-opus-4-1"}}
 		require.NoError(t, ValidateConfig(cfg))
 	})
 
@@ -197,6 +197,7 @@ func validConfig() *Config {
 		Providers: Providers{
 			OpenAI: OpenAI{
 				APIKey: "key",
+				Model:  "gpt-5-mini",
 			},
 		},
 		Polling: Polling{IntervalSeconds: 60},

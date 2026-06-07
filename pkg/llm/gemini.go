@@ -3,6 +3,8 @@ package llm
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"google.golang.org/genai"
 )
@@ -14,9 +16,10 @@ type GeminiCompletion struct {
 }
 
 type GeminiConfig struct {
-	APIKey    string
-	Model     string
-	MaxTokens int32
+	APIKey         string
+	Model          string
+	MaxTokens      int32
+	RequestTimeout time.Duration
 }
 
 func NewGeminiCompletion(ctx context.Context, cfg *GeminiConfig) (*GeminiCompletion, error) {
@@ -49,8 +52,11 @@ func (c *GeminiCompletion) Completion(userPrompt, systemPrompt string) (string, 
 		genai.NewContentFromParts(parts, genai.RoleUser),
 	}
 
+	requestCtx, cancel := withRequestTimeout(c.ctx, c.config.RequestTimeout)
+	defer cancel()
+
 	think := int32(0)
-	resp, err := c.client.Models.GenerateContent(c.ctx, c.config.Model, content, &genai.GenerateContentConfig{
+	resp, err := c.client.Models.GenerateContent(requestCtx, c.config.Model, content, &genai.GenerateContentConfig{
 		MaxOutputTokens: c.config.MaxTokens,
 		SystemInstruction: &genai.Content{
 			Parts: []*genai.Part{{Text: systemPrompt}},
@@ -63,9 +69,10 @@ func (c *GeminiCompletion) Completion(userPrompt, systemPrompt string) (string, 
 		return "", fmt.Errorf("the Gemini request failed: %w", err)
 	}
 
-	if resp.Text() == "" {
+	output := strings.TrimSpace(resp.Text())
+	if output == "" {
 		return "", fmt.Errorf("empty LLM response")
 	}
 
-	return resp.Text(), nil
+	return output, nil
 }
