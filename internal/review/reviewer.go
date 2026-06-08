@@ -156,46 +156,34 @@ func (r *Reviewer) postComments(review *upsource.Review, comments []*llm.ReviewC
 
 	for _, comment := range comments {
 		thereIsLine := comment.LineNumber > 0 && comment.FilePath != "" && comment.LineVerified
-		switch {
-		case comment.Severity == llm.SeverityHigh && r.config.Review.PostInLine == "high" && thereIsLine:
+		if thereIsLine {
 			inlineComments = append(inlineComments, comment)
-		case (comment.Severity == llm.SeverityMedium || comment.Severity == llm.SeverityHigh) && r.config.Review.PostInLine == "mid" && thereIsLine:
-			inlineComments = append(inlineComments, comment)
-		case r.config.Review.PostInLine == "low" && thereIsLine:
-			inlineComments = append(inlineComments, comment)
-		default:
+		} else {
 			postInOneComments = append(postInOneComments, comment)
 		}
 	}
 
 	for _, comment := range inlineComments {
-		err := upsource.CreateDiscussion(r.ctx, r.upsourceClient, r.config, upsource.CreateDiscussionRequest{
-			Review:  review,
-			Comment: comment.Comment,
-			File:    comment.FilePath,
-			Line:    comment.LineNumber,
-		})
+		err := r.createDiscussion(comment, review)
 		if err != nil {
 			return fmt.Errorf("failed to post inline comment to %s:%d -> %s: %w", comment.FilePath, comment.LineNumber, comment.Comment, err)
 		}
-		metrics.DefaultRecorder.RecordReviewCommentsPosted(1)
 	}
 
 	if len(postInOneComments) > 0 {
-		if err := r.createOneDiscussion(postInOneComments, review); err != nil {
+		if err := r.createDiscussionWithoutLine(postInOneComments, review); err != nil {
 			return fmt.Errorf("failed to post comments to review %s: %w", review.GetBranch(), err)
 		}
-		metrics.DefaultRecorder.RecordReviewCommentsPosted(len(postInOneComments))
 	}
 
 	return nil
 }
 
-// createOneDiscussion posts a single discussion to Upsource, containing low and medium priority comments.
-func (r *Reviewer) createOneDiscussion(comments []*llm.ReviewComment, review *upsource.Review) error {
+// createDiscussionWithoutLine posts comments to a single discussion to Upsource without a link to a file and a line in it
+func (r *Reviewer) createDiscussionWithoutLine(comments []*llm.ReviewComment, review *upsource.Review) error {
 	discussionText := generateLowPriorityComment(comments)
 	if len(discussionText) > 0 {
-		err := upsource.CreateDiscussion(r.ctx, r.upsourceClient, r.config, upsource.CreateDiscussionRequest{
+		err := upsource.CreateDiscussion(r.ctx, r.upsourceClient, r.config.Upsource.ReviewedLabel, upsource.CreateDiscussionRequest{
 			Review:  review,
 			Comment: discussionText,
 			File:    "",
@@ -204,7 +192,24 @@ func (r *Reviewer) createOneDiscussion(comments []*llm.ReviewComment, review *up
 		if err != nil {
 			return fmt.Errorf("failed to post low priority comment to review %s: %w", review.GetBranch(), err)
 		}
+		metrics.DefaultRecorder.RecordReviewCommentsPosted(len(comments))
 	}
+
+	return nil
+}
+
+// createDiscussion posts a single discussion to Upsource.
+func (r *Reviewer) createDiscussion(comment *llm.ReviewComment, review *upsource.Review) error {
+	err := upsource.CreateDiscussion(r.ctx, r.upsourceClient, r.config.Upsource.ReviewedLabel, upsource.CreateDiscussionRequest{
+		Review:  review,
+		Comment: comment.Comment,
+		File:    comment.FilePath,
+		Line:    comment.LineNumber,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to post low priority comment to review %s: %w", review.GetBranch(), err)
+	}
+	metrics.DefaultRecorder.RecordReviewCommentsPosted(1)
 
 	return nil
 }

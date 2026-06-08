@@ -18,18 +18,6 @@ func TestReviewValidate(t *testing.T) {
 		require.EqualError(t, r.Validate(), "review.maxPerReview is required")
 	})
 
-	t.Run("fails when post inline is missing", func(t *testing.T) {
-		r := validReview()
-		r.PostInLine = ""
-		require.EqualError(t, r.Validate(), "review.postInLine is required")
-	})
-
-	t.Run("fails when post inline value is invalid", func(t *testing.T) {
-		r := validReview()
-		r.PostInLine = "critical"
-		require.EqualError(t, r.Validate(), "review.postInLine must be one of: high, mid, low, none")
-	})
-
 	t.Run("fails when system message is missing", func(t *testing.T) {
 		r := validReview()
 		r.SystemMessage = ""
@@ -63,7 +51,6 @@ func TestContainsFmtError(t *testing.T) {
 func validReview() *Review {
 	return &Review{
 		MaxPerReview:       10,
-		PostInLine:         "high",
 		SystemMessage:      "max %d",
 		UserPromptTemplate: "%s %s",
 	}

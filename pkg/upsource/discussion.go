@@ -7,8 +7,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/groall/upsource-go-client/client"
-
-	"github.com/groall/upsource-ai-reviewer/pkg/config"
 )
 
 // ListReviewDiscussions returns the discussions belonging to a specific review.
@@ -114,7 +112,7 @@ type CreateDiscussionRequest struct {
 const markdownMarkupType = "markdown"
 
 // CreateDiscussion creates a discussion for a given review, file, and line.
-func CreateDiscussion(ctx context.Context, upsourceClient *client.Client, config *config.Config, req CreateDiscussionRequest) error {
+func CreateDiscussion(ctx context.Context, upsourceClient *client.Client, reviewedLabel string, req CreateDiscussionRequest) error {
 	if req.File == "" { // No file specified, create a general discussion
 		_, err := upsourceClient.CreateDiscussion(ctx, client.CreateDiscussionRequestDTO{
 			Anchor:     client.AnchorDTO{},
@@ -122,7 +120,7 @@ func CreateDiscussion(ctx context.Context, upsourceClient *client.Client, config
 			Text:       req.Comment,
 			ProjectID:  req.Review.review.ReviewID.ProjectID,
 			MarkupType: markdownMarkupType,
-			Labels:     []client.LabelDTO{{Name: config.Upsource.ReviewedLabel}},
+			Labels:     []client.LabelDTO{{Name: reviewedLabel}},
 		})
 
 		return err
@@ -144,7 +142,7 @@ func CreateDiscussion(ctx context.Context, upsourceClient *client.Client, config
 			Text:       req.Comment,
 			ProjectID:  req.Review.review.ReviewID.ProjectID,
 			MarkupType: markdownMarkupType,
-			Labels:     []client.LabelDTO{{Name: config.Upsource.ReviewedLabel}},
+			Labels:     []client.LabelDTO{{Name: reviewedLabel}},
 		})
 
 		return err

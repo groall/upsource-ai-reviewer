@@ -190,7 +190,6 @@ func validConfig() *Config {
 		},
 		Review: Review{
 			MaxPerReview:       10,
-			PostInLine:         "high",
 			SystemMessage:      "max %d",
 			UserPromptTemplate: "%s %s",
 		},

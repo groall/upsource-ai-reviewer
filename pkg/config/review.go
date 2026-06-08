@@ -7,7 +7,6 @@ import (
 
 type Review struct {
 	MaxPerReview       int    `yaml:"maxPerReview"`
-	PostInLine         string `yaml:"postInLine"` // high, mid, low, none
 	SystemMessage      string `yaml:"systemMessage"`
 	UserPromptTemplate string `yaml:"userPromptTemplate"`
 }
@@ -15,12 +14,6 @@ type Review struct {
 func (r *Review) Validate() error {
 	if r.MaxPerReview == 0 {
 		return fmt.Errorf("review.maxPerReview is required")
-	}
-	if r.PostInLine == "" {
-		return fmt.Errorf("review.postInLine is required")
-	}
-	if r.PostInLine != "high" && r.PostInLine != "mid" && r.PostInLine != "low" && r.PostInLine != "none" {
-		return fmt.Errorf("review.postInLine must be one of: high, mid, low, none")
 	}
 	if r.SystemMessage == "" {
 		return fmt.Errorf("review.systemMessage is required")

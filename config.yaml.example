@@ -107,7 +107,6 @@ gitlab:
 
 review:
   maxPerReview: 10  # Maximum number of comments per review
-  postInLine: high # Post comments inline for selected severity issues. Options: high, mid, low, none
   systemMessage: |
     You are Code Reviewer, an AI specializing in diffs code analysis and suggestions.
     Your task is to examine the provided code diff (git-style), focusing on new code (lines prefixed with '+'), and offer concise, actionable suggestions to fix possible bugs and problems, and enhance code quality and performance.
