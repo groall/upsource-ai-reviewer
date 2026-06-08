@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
 
 	"github.com/groall/upsource-ai-reviewer/internal/git"
 	"github.com/groall/upsource-ai-reviewer/internal/metrics"
@@ -53,11 +54,20 @@ func (r *replier) replyToOpenThreads() error {
 		return fmt.Errorf("failed to list reviewed reviews: %w", err)
 	}
 
-	log.Printf("Reply pass: scanning %d already-reviewed reviews\n", len(reviews))
+	projects, reviewsByProject := groupReviewsByProject(reviews)
+	log.Printf("Reply pass: scanning %d already-reviewed reviews across %d projects\n", len(reviews), len(projects))
 
-	for _, review := range reviews {
-		if err := r.replyInReview(review, botUserID); err != nil {
-			log.Printf("Reply pass error in review %s: %v\n", review.GetBranch(), err)
+	for _, projectID := range projects {
+		projectReviews := reviewsByProject[projectID]
+		sort.Slice(projectReviews, func(i, j int) bool {
+			return projectReviews[i].GetBranch() < projectReviews[j].GetBranch()
+		})
+		log.Printf("Reply pass: processing %d reviews in project %s\n", len(projectReviews), projectID)
+
+		for _, review := range projectReviews {
+			if err := r.replyInReview(review, botUserID); err != nil {
+				log.Printf("Reply pass error in review %s: %v\n", review.GetBranch(), err)
+			}
 		}
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 
 	"github.com/groall/upsource-go-client/client"
@@ -67,22 +68,31 @@ func (r *Reviewer) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to list reviews: %w", err)
 	}
-	log.Printf("Found %d reviews to process.\n", len(reviews))
+	projects, reviewsByProject := groupReviewsByProject(reviews)
+	log.Printf("Found %d reviews to process across %d projects.\n", len(reviews), len(projects))
 
 	var comments []*llm.ReviewComment
-	for _, review := range reviews {
-		if comments, err = r.doReview(review); err != nil {
-			log.Printf("Error processing review %s: %v\n", review.GetBranch(), err)
-			continue
-		}
+	for _, projectID := range projects {
+		projectReviews := reviewsByProject[projectID]
+		sort.Slice(projectReviews, func(i, j int) bool {
+			return projectReviews[i].GetBranch() < projectReviews[j].GetBranch()
+		})
+		log.Printf("Processing %d reviews in project %s.\n", len(projectReviews), projectID)
 
-		if len(comments) == 0 {
-			log.Printf("AI Reviewer found no issues to comment on for %s.\n", review.GetBranch())
-			continue
-		}
+		for _, review := range projectReviews {
+			if comments, err = r.doReview(review); err != nil {
+				log.Printf("Error processing review %s: %v\n", review.GetBranch(), err)
+				continue
+			}
 
-		if err := r.postComments(review, comments); err != nil {
-			log.Printf("Error posting comments for review %s: %v\n", review.GetBranch(), err)
+			if len(comments) == 0 {
+				log.Printf("AI Reviewer found no issues to comment on for %s.\n", review.GetBranch())
+				continue
+			}
+
+			if err := r.postComments(review, comments); err != nil {
+				log.Printf("Error posting comments for review %s: %v\n", review.GetBranch(), err)
+			}
 		}
 	}
 
@@ -91,6 +101,21 @@ func (r *Reviewer) Run() error {
 	}
 
 	return nil
+}
+
+func groupReviewsByProject(reviews []*upsource.Review) ([]string, map[string][]*upsource.Review) {
+	byProject := make(map[string][]*upsource.Review)
+	for _, review := range reviews {
+		projectID := review.GetProjectID()
+		byProject[projectID] = append(byProject[projectID], review)
+	}
+
+	projects := make([]string, 0, len(byProject))
+	for projectID := range byProject {
+		projects = append(projects, projectID)
+	}
+	sort.Strings(projects)
+	return projects, byProject
 }
 
 func (r *Reviewer) doReview(review *upsource.Review) ([]*llm.ReviewComment, error) {
