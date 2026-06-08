@@ -22,7 +22,6 @@ type Reviewer struct {
 	config         *config.Config
 	ctx            context.Context
 	llmReviewer    *llm.Reviewer
-	gitProvider    git.Provider
 	replier        *replier
 }
 
@@ -42,19 +41,24 @@ func New(ctx context.Context, config *config.Config) (*Reviewer, error) {
 		return nil, fmt.Errorf("failed to create GitLab provider: %w", err)
 	}
 
-	llmReviewer, err := llm.New(ctx, config)
+	llmReviewer, err := llm.New(ctx, config, gitlabProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create LLM reviewer: %w", err)
 	}
+	llmReplier := llm.NewReplier(llmReviewer)
 
-	replier, err := newReplier(ctx, config, upsourceClient, gitlabProvider, llmReviewer)
+	replierConfig := &replierConfig{
+		reviewedLabel:      config.Upsource.ReviewedLabel,
+		maxPerThread:       config.Replies.MaxPerThread,
+		searchReviewsQuery: config.Upsource.Query,
+	}
+	replier, err := newReplier(ctx, replierConfig, upsourceClient, llmReplier)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create replier: %w", err)
 	}
 
 	return &Reviewer{
 		upsourceClient: upsourceClient,
-		gitProvider:    gitlabProvider,
 		llmReviewer:    llmReviewer,
 		replier:        replier,
 		config:         config,
@@ -96,8 +100,10 @@ func (r *Reviewer) Run() error {
 		}
 	}
 
-	if err := r.replier.replyToOpenThreads(); err != nil {
-		log.Printf("Error during thread replies: %v", err)
+	if r.config.Replies.Enabled {
+		if err := r.replier.replyToOpenThreads(); err != nil {
+			log.Printf("Error during thread replies: %v", err)
+		}
 	}
 
 	return nil
@@ -121,12 +127,7 @@ func groupReviewsByProject(reviews []*upsource.Review) ([]string, map[string][]*
 func (r *Reviewer) doReview(review *upsource.Review) ([]*llm.ReviewComment, error) {
 	log.Printf("Processing review for the branch %s.\n", review.GetBranch())
 
-	changes, commitsComments, err := r.gitProvider.GetReviewChanges(review)
-	if err != nil {
-		return nil, fmt.Errorf("error getting review changes for %s: %w", review.GetBranch(), err)
-	}
-
-	comments, err := r.llmReviewer.Do(changes, commitsComments)
+	comments, err := r.llmReviewer.Do(review)
 	if err != nil {
 		return nil, fmt.Errorf("error getting review comments for %s: %w", review.GetBranch(), err)
 	}

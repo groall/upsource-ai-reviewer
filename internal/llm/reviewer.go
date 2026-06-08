@@ -7,21 +7,25 @@ import (
 	"log"
 	"strings"
 
+	"github.com/groall/upsource-ai-reviewer/internal/git"
 	"github.com/groall/upsource-ai-reviewer/internal/metrics"
 	"github.com/groall/upsource-ai-reviewer/pkg/config"
+	"github.com/groall/upsource-ai-reviewer/pkg/upsource"
 )
 
 type Reviewer struct {
 	llmProvider Provider
+	gitProvider git.Provider
 	config      *config.Config
 	ctx         context.Context
 }
 
 // New creates a new LLM Reviewer instance.
-func New(ctx context.Context, cfg *config.Config) (*Reviewer, error) {
+func New(ctx context.Context, cfg *config.Config, gitProvider git.Provider) (*Reviewer, error) {
 	reviewer := &Reviewer{
-		config: cfg,
-		ctx:    ctx,
+		config:      cfg,
+		ctx:         ctx,
+		gitProvider: gitProvider,
 	}
 
 	var err error
@@ -34,7 +38,12 @@ func New(ctx context.Context, cfg *config.Config) (*Reviewer, error) {
 }
 
 // Do calls OpenAI Chat Completion API to review changes.
-func (c *Reviewer) Do(changes string, commitsComments string) ([]*ReviewComment, error) {
+func (c *Reviewer) Do(review *upsource.Review) ([]*ReviewComment, error) {
+	changes, commitsComments, err := c.gitProvider.GetReviewChanges(review)
+	if err != nil {
+		return nil, fmt.Errorf("error getting review changes for %s: %w", review.GetBranch(), err)
+	}
+
 	// Build a concise prompt and send to OpenAI-compatible API using SDK
 	prompt := fmt.Sprintf(c.config.Review.UserPromptTemplate, changes, commitsComments)
 

@@ -6,9 +6,7 @@ import (
 	"log"
 	"sort"
 
-	"github.com/groall/upsource-ai-reviewer/internal/git"
 	"github.com/groall/upsource-ai-reviewer/internal/metrics"
-	"github.com/groall/upsource-ai-reviewer/pkg/config"
 	"github.com/groall/upsource-go-client/client"
 
 	"github.com/groall/upsource-ai-reviewer/internal/llm"
@@ -17,20 +15,24 @@ import (
 
 type replier struct {
 	upsourceClient *client.Client
-	config         *config.Config
+	config         *replierConfig
 	ctx            context.Context
-	llmReviewer    *llm.Reviewer
-	gitProvider    git.Provider
+	llmReplier     *llm.Replier
 	botUserID      string
 }
 
-func newReplier(ctx context.Context, config *config.Config, upsourceClient *client.Client, gitProvider git.Provider, llmReviewer *llm.Reviewer) (*replier, error) {
+type replierConfig struct {
+	reviewedLabel      string
+	maxPerThread       int
+	searchReviewsQuery string
+}
+
+func newReplier(ctx context.Context, config *replierConfig, upsourceClient *client.Client, llmReplier *llm.Replier) (*replier, error) {
 	replier := &replier{
 		config:         config,
 		ctx:            ctx,
 		upsourceClient: upsourceClient,
-		gitProvider:    gitProvider,
-		llmReviewer:    llmReviewer,
+		llmReplier:     llmReplier,
 	}
 
 	return replier, nil
@@ -40,16 +42,12 @@ func newReplier(ctx context.Context, config *config.Config, upsourceClient *clie
 // follow-up reply in any thread where a human spoke after the bot's last word.
 // Errors are logged per discussion / per review; a single failure never aborts the loop.
 func (r *replier) replyToOpenThreads() error {
-	if !r.config.Replies.Enabled {
-		return nil
-	}
-
 	botUserID, err := r.resolveBotUserID()
 	if err != nil {
 		return fmt.Errorf("failed to resolve bot user id: %w", err)
 	}
 
-	reviews, err := upsource.ListReviewedReviews(r.ctx, r.upsourceClient, r.config.Upsource.Query, r.config.Upsource.ReviewedLabel)
+	reviews, err := upsource.ListReviewedReviews(r.ctx, r.upsourceClient, r.config.searchReviewsQuery, r.config.reviewedLabel)
 	if err != nil {
 		return fmt.Errorf("failed to list reviewed reviews: %w", err)
 	}
@@ -83,27 +81,16 @@ func (r *replier) replyInReview(review *upsource.Review, botUserID string) error
 		return nil
 	}
 
-	var codeContext string
+	reviewReplier := r.llmReplier.ForReview(review)
+
 	for _, d := range discussions {
-		last, ok := upsource.ShouldReplyToDiscussion(d, r.config.Upsource.ReviewedLabel, botUserID, r.config.Replies.MaxPerThread)
+		last, ok := upsource.ShouldReplyToDiscussion(d, r.config.reviewedLabel, botUserID, r.config.maxPerThread)
 		if !ok {
 			log.Printf("Skipping discussion %s in review %s\n", d.DiscussionID, review.GetBranch())
 			continue
 		}
 
-		if codeContext == "" {
-			diff, _, derr := r.gitProvider.GetReviewChanges(review)
-			if derr != nil {
-				return fmt.Errorf("get review changes: %w", derr)
-			}
-			codeContext = diff
-		}
-
-		thread := buildThreadTranscript(d.Comments, botUserID)
-		fileContext := codeContext
-		anchorText := buildReplyAnchorText(d.Anchor)
-
-		reply, lerr := r.llmReviewer.Reply(thread, fileContext, anchorText)
+		reply, lerr := reviewReplier.Reply(d, botUserID)
 		if lerr != nil {
 			log.Printf("Failed to get reply for discussion %s: %v\n", d.DiscussionID, lerr)
 			continue
@@ -142,29 +129,4 @@ func (r *replier) resolveBotUserID() (string, error) {
 	r.botUserID = user.UserID
 
 	return r.botUserID, nil
-}
-
-func buildThreadTranscript(comments []client.CommentDTO, botUserID string) []llm.CommentMsg {
-	out := make([]llm.CommentMsg, 0, len(comments))
-	for _, c := range comments {
-		out = append(out, llm.CommentMsg{
-			Author: c.AuthorID,
-			IsBot:  c.AuthorID == botUserID,
-			Text:   c.Text,
-		})
-	}
-	return out
-}
-
-func buildReplyAnchorText(anchor client.AnchorDTO) string {
-	if anchor.FileID == "" {
-		return ""
-	}
-
-	var rangeText string
-	if anchor.Range != nil {
-		rangeText = fmt.Sprintf(" range=[%d,%d]", anchor.Range.StartOffset, anchor.Range.EndOffset)
-	}
-
-	return fmt.Sprintf("fileId=%s revisionId=%s inlineInRevision=%s%s", anchor.FileID, anchor.RevisionID, anchor.InlineInRevision, rangeText)
 }

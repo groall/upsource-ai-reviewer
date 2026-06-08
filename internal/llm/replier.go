@@ -7,8 +7,40 @@ import (
 	"log"
 	"strings"
 
+	"github.com/groall/upsource-ai-reviewer/internal/git"
 	"github.com/groall/upsource-ai-reviewer/internal/metrics"
+	"github.com/groall/upsource-ai-reviewer/pkg/config"
+	"github.com/groall/upsource-ai-reviewer/pkg/upsource"
+	"github.com/groall/upsource-go-client/client"
 )
+
+type Replier struct {
+	llmProvider Provider
+	gitProvider git.Provider
+	config      *config.Config
+}
+
+type reviewReplier struct {
+	replier     *Replier
+	review      *upsource.Review
+	codeContext string
+	loaded      bool
+}
+
+func NewReplier(reviewer *Reviewer) *Replier {
+	return &Replier{
+		llmProvider: reviewer.llmProvider,
+		gitProvider: reviewer.gitProvider,
+		config:      reviewer.config,
+	}
+}
+
+func (r *Replier) ForReview(review *upsource.Review) *reviewReplier {
+	return &reviewReplier{
+		replier: r,
+		review:  review,
+	}
+}
 
 // CommentMsg is a single message in a thread transcript passed to the LLM.
 type CommentMsg struct {
@@ -32,10 +64,22 @@ const replyUserPromptPrefixTemplate = `### Original code context
 `
 
 // Reply asks the LLM to produce a follow-up reply for a discussion thread.
-func (c *Reviewer) Reply(thread []CommentMsg, codeContext string, anchorText string) (*ReplyResult, error) {
-	if c.config.Replies.SystemMessage == "" {
+func (r *Replier) Reply(review *upsource.Review, d client.DiscussionInFileDTO, botUserID string) (*ReplyResult, error) {
+	return r.ForReview(review).Reply(d, botUserID)
+}
+
+func (rr *reviewReplier) Reply(d client.DiscussionInFileDTO, botUserID string) (*ReplyResult, error) {
+	if rr.replier.config.Replies.SystemMessage == "" {
 		return nil, fmt.Errorf("replies.systemMessage is not configured")
 	}
+
+	thread := buildThreadTranscript(d.Comments, botUserID)
+
+	codeContext, err := rr.loadCodeContext()
+	if err != nil {
+		return nil, err
+	}
+	anchorText := buildReplyAnchorText(d.Anchor)
 
 	threadText := formatThread(thread)
 	userPrompt, prefix, suffix := buildReplyPromptParts(codeContext, anchorText, threadText)
@@ -43,23 +87,23 @@ func (c *Reviewer) Reply(thread []CommentMsg, codeContext string, anchorText str
 	log.Print("Sending reply prompt to LLM...")
 
 	var replyText string
-	var err error
+	var llmErr error
 	if prefix != "" {
-		if p, ok := c.llmProvider.(PrefixCacheProvider); ok {
-			replyText, err = p.CompletionWithPrefixCache(prefix, suffix, c.config.Replies.SystemMessage)
-			if err != nil {
-				log.Printf("Prefix-cache reply failed, retrying without prefix cache: %v", err)
-				replyText, err = c.complete(userPrompt, c.config.Replies.SystemMessage)
+		if p, ok := rr.replier.llmProvider.(PrefixCacheProvider); ok {
+			replyText, llmErr = p.CompletionWithPrefixCache(prefix, suffix, rr.replier.config.Replies.SystemMessage)
+			if llmErr != nil {
+				log.Printf("Prefix-cache reply failed, retrying without prefix cache: %v", llmErr)
+				replyText, llmErr = rr.replier.complete(userPrompt, rr.replier.config.Replies.SystemMessage)
 			}
 		} else {
-			replyText, err = c.complete(userPrompt, c.config.Replies.SystemMessage)
+			replyText, llmErr = rr.replier.complete(userPrompt, rr.replier.config.Replies.SystemMessage)
 		}
 	} else {
-		replyText, err = c.complete(userPrompt, c.config.Replies.SystemMessage)
+		replyText, llmErr = rr.replier.complete(userPrompt, rr.replier.config.Replies.SystemMessage)
 	}
-	if err != nil {
-		metrics.DefaultRecorder.RecordLLMError(metrics.OperationReply, c.config.Providers.ActiveLLMProvider())
-		return nil, fmt.Errorf("LLM reply request failed: %w", err)
+	if llmErr != nil {
+		metrics.DefaultRecorder.RecordLLMError(metrics.OperationReply, rr.replier.config.Providers.ActiveLLMProvider())
+		return nil, fmt.Errorf("LLM reply request failed: %w", llmErr)
 	}
 
 	reply := strings.TrimSpace(replyText)
@@ -74,6 +118,25 @@ func (c *Reviewer) Reply(thread []CommentMsg, codeContext string, anchorText str
 	}
 
 	return &result, nil
+}
+
+func (r *Replier) complete(userPrompt, systemPrompt string) (string, error) {
+	return r.llmProvider.Completion(userPrompt, systemPrompt)
+}
+
+func (rr *reviewReplier) loadCodeContext() (string, error) {
+	if rr.loaded {
+		return rr.codeContext, nil
+	}
+
+	codeContext, _, err := rr.replier.gitProvider.GetReviewChanges(rr.review)
+	if err != nil {
+		return "", fmt.Errorf("get review changes: %w", err)
+	}
+
+	rr.codeContext = codeContext
+	rr.loaded = true
+	return rr.codeContext, nil
 }
 
 func buildReplyPromptParts(codeContext, anchorText, threadText string) (fullPrompt, prefix, suffix string) {
@@ -106,4 +169,29 @@ func parseLLMDiscissionReply(content string) string {
 	}
 
 	return ""
+}
+
+func buildThreadTranscript(comments []client.CommentDTO, botUserID string) []CommentMsg {
+	out := make([]CommentMsg, 0, len(comments))
+	for _, c := range comments {
+		out = append(out, CommentMsg{
+			Author: c.AuthorID,
+			IsBot:  c.AuthorID == botUserID,
+			Text:   c.Text,
+		})
+	}
+	return out
+}
+
+func buildReplyAnchorText(anchor client.AnchorDTO) string {
+	if anchor.FileID == "" {
+		return ""
+	}
+
+	var rangeText string
+	if anchor.Range != nil {
+		rangeText = fmt.Sprintf(" range=[%d,%d]", anchor.Range.StartOffset, anchor.Range.EndOffset)
+	}
+
+	return fmt.Sprintf("fileId=%s revisionId=%s inlineInRevision=%s%s", anchor.FileID, anchor.RevisionID, anchor.InlineInRevision, rangeText)
 }

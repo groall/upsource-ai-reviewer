@@ -5,7 +5,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/groall/upsource-ai-reviewer/internal/git"
 	"github.com/groall/upsource-ai-reviewer/pkg/config"
+	"github.com/groall/upsource-ai-reviewer/pkg/upsource"
+	"github.com/groall/upsource-go-client/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,14 +31,29 @@ func (m *prefixCacheMockProvider) CompletionWithPrefixCache(userPromptPrefix, us
 	return m.prefixResult, m.prefixErr
 }
 
+type replierMockGitProvider struct {
+	changes string
+	commits string
+	err     error
+	calls   int
+}
+
+func (p *replierMockGitProvider) GetReviewChanges(review git.Review) (string, string, error) {
+	p.calls++
+	return p.changes, p.commits, p.err
+}
+
 func TestReplyFallsBackWhenPrefixCacheFails(t *testing.T) {
 	provider := &prefixCacheMockProvider{
 		prefixErr:        errors.New("prefix cache failed"),
 		completionResult: `{"comment":"done","close":true}`,
 	}
 
+	gitProvider := &replierMockGitProvider{changes: "code context"}
+
 	reviewer := &Reviewer{
 		llmProvider: provider,
+		gitProvider: gitProvider,
 		config: &config.Config{
 			Replies: config.Replies{
 				SystemMessage: "reply system",
@@ -44,10 +62,13 @@ func TestReplyFallsBackWhenPrefixCacheFails(t *testing.T) {
 		ctx: context.Background(),
 	}
 
-	result, err := reviewer.Reply(
-		[]CommentMsg{{Author: "dev", Text: "ok"}},
-		"code context",
-		"anchor",
+	replier := NewReplier(reviewer).ForReview(&upsource.Review{})
+
+	result, err := replier.Reply(
+		client.DiscussionInFileDTO{
+			Comments: []client.CommentDTO{{AuthorID: "dev", Text: "ok"}},
+		},
+		"bot",
 	)
 	require.NoError(t, err)
 	require.Equal(t, "done", result.Comment)
@@ -62,8 +83,11 @@ func TestReplyReturnsErrorWhenPrefixAndFallbackFail(t *testing.T) {
 		completionErr: errors.New("plain completion failed"),
 	}
 
+	gitProvider := &replierMockGitProvider{changes: "code context"}
+
 	reviewer := &Reviewer{
 		llmProvider: provider,
+		gitProvider: gitProvider,
 		config: &config.Config{
 			Replies: config.Replies{
 				SystemMessage: "reply system",
@@ -72,10 +96,13 @@ func TestReplyReturnsErrorWhenPrefixAndFallbackFail(t *testing.T) {
 		ctx: context.Background(),
 	}
 
-	result, err := reviewer.Reply(
-		[]CommentMsg{{Author: "dev", Text: "ok"}},
-		"code context",
-		"anchor",
+	replier := NewReplier(reviewer).ForReview(&upsource.Review{})
+
+	result, err := replier.Reply(
+		client.DiscussionInFileDTO{
+			Comments: []client.CommentDTO{{AuthorID: "dev", Text: "ok"}},
+		},
+		"bot",
 	)
 	require.Nil(t, result)
 	require.ErrorContains(t, err, "LLM reply request failed")
