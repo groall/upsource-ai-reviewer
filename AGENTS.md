@@ -61,7 +61,7 @@ At least one must be configured or startup fails.
 | Section     | Key fields |
 |-------------|---|
 | `polling`   | `intervalSeconds` |
-| `review`    | `maxPerReview`, `postInLine` (high / mid / low / none), `systemMessage`, `userPromptTemplate` |
+| `review`    | `maxPerReview`, `postInLine` (high / mid / low / none), `systemMessageIntro`, `systemMessageGuidelines`, `systemMessageOutputFormat`, `userPromptTemplate` |
 | `upsource`  | `baseUrl`, `username`, `password`, `query`, `reviewedLabel`, `invitationLabel` |
 | `gitlab`    | `baseUrl`, `accessToken` |
 | `openai`    | `apiKey`, `endpoint`, `model`, `maxTokens`, `temperature`, `requestTimeout` |

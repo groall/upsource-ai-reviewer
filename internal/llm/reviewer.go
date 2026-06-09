@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 
 	"github.com/groall/upsource-ai-reviewer/internal/git"
@@ -45,13 +46,14 @@ func (c *Reviewer) Do(review *upsource.Review) ([]*ReviewComment, error) {
 	}
 
 	// Build a concise prompt and send to OpenAI-compatible API using SDK
-	prompt := fmt.Sprintf(c.cfg.UserPromptTemplate, changes, commitsComments)
+	userPrompt := strings.Replace(c.cfg.SystemMessage, "{{diffs}}", changes, -1)
+	userPrompt = strings.Replace(userPrompt, "{{messages}}", commitsComments, -1)
 
-	systemMessage := fmt.Sprintf(c.cfg.SystemMessage, c.cfg.MaxPerReview)
+	systemPrompt := strings.Replace(c.cfg.SystemMessage, "{{max_per_review}}", strconv.Itoa(c.cfg.MaxPerReview), -1)
 
 	log.Print("Sending prompt to LLM...")
 
-	llmResponse, err := c.complete(prompt, systemMessage)
+	llmResponse, err := c.complete(userPrompt, systemPrompt)
 	if err != nil {
 		metrics.DefaultRecorder.RecordLLMError(metrics.OperationReview, c.cfg.ActiveProvider)
 		return nil, fmt.Errorf("LLM request failed: %w", err)

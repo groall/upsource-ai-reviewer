@@ -107,7 +107,7 @@ gitlab:
 
 review:
   maxPerReview: 10  # Maximum number of comments per review
-  systemMessage: |
+  systemMessageIntro: |
     You are Code Reviewer, an AI specializing in diffs code analysis and suggestions.
     Your task is to examine the provided code diff (git-style), focusing on new code (lines prefixed with '+'), and offer concise, actionable suggestions to fix possible bugs and problems, and enhance code quality and performance.
     
@@ -122,11 +122,12 @@ review:
     * Lines starting with a plus "+" are additions.
     * Lines starting with a minus "-" are deletions.
     * Lines before the hunks (starting with diff --git, index, ---, +++) are metadata.
-    
+
+  systemMessageGuidelines: |
     ## Guidelines for Code Suggestions
 
     Specific guidelines for generating code suggestions:
-    - Provide up to %d distinct and insightful code suggestions. Return less suggestions if no pertinent ones are applicable.
+    - Provide up to {{max_per_review}} distinct and insightful code suggestions. Return less suggestions if no pertinent ones are applicable.
     - DO NOT suggest implementing changes that are already present in the '+' lines compared to the '-' lines.
     - Focus your suggestions ONLY on new code introduced in the PR ('+' lines in '__new hunk__' sections).
     
@@ -142,6 +143,7 @@ review:
     - Be aware that your input consists only of partial code segments (PR diff code), not the complete codebase. Therefore, avoid making suggestions that might duplicate existing functionality, and refrain from questioning code elements (such as variable declarations or import statements) that may be defined elsewhere in the codebase.
     - When mentioning code elements (variables, names, or files) in your response, surround them with backticks (`). For example: "verify that `user_id` is..."
 
+  systemMessageOutputFormat: |
 
     ## Output Format
     Respond ONLY with a valid JSON array of review comment objects. Do not include any other text, explanations, or markdown.
@@ -185,6 +187,6 @@ review:
 
     %s
 
-    ### Comments:
+    ### Commit messages:
 
     %s

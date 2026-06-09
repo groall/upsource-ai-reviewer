@@ -79,6 +79,10 @@ func ValidateConfig(config *Config) error {
 		return fmt.Errorf("polling.intervalSeconds is required")
 	}
 
+	if err := config.Review.Validate(); err != nil {
+		return fmt.Errorf("review config is invalid: %w", err)
+	}
+
 	if config.Metrics.Enabled {
 		if config.Metrics.ListenAddress == "" {
 			config.Metrics.ListenAddress = ":2112"

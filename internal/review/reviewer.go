@@ -44,7 +44,7 @@ func New(ctx context.Context, config *config.Config) (*Reviewer, error) {
 	activeProvider := config.Providers.ActiveLLMProvider()
 	llmReviewerCfg := llm.ReviewConfig{
 		UserPromptTemplate: config.Review.UserPromptTemplate,
-		SystemMessage:      config.Review.SystemMessage,
+		SystemMessage:      config.Review.SystemMessageTemplate(),
 		MaxPerReview:       config.Review.MaxPerReview,
 		ActiveProvider:     activeProvider,
 	}
@@ -192,6 +192,58 @@ func (r *Reviewer) postComments(review *upsource.Review, comments []*llm.ReviewC
 	}
 
 	return nil
+}
+
+// sortAndCapComments sorts and caps comments.
+func sortAndCapComments(comments []*llm.ReviewComment, maxPerReview int) []*llm.ReviewComment {
+	if len(comments) == 0 {
+		return nil
+	}
+
+	sorted := append([]*llm.ReviewComment(nil), comments...)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		a := sorted[i]
+		b := sorted[j]
+
+		aRank := severityRank(a.Severity)
+		bRank := severityRank(b.Severity)
+		if aRank != bRank {
+			return aRank < bRank
+		}
+
+		aInline := a.LineNumber > 0 && a.FilePath != "" && a.LineVerified
+		bInline := b.LineNumber > 0 && b.FilePath != "" && b.LineVerified
+		if aInline != bInline {
+			return aInline
+		}
+
+		if a.FilePath != b.FilePath {
+			return a.FilePath < b.FilePath
+		}
+		if a.LineNumber != b.LineNumber {
+			return a.LineNumber < b.LineNumber
+		}
+		return a.Comment < b.Comment
+	})
+
+	if maxPerReview > 0 && len(sorted) > maxPerReview {
+		sorted = sorted[:maxPerReview]
+	}
+
+	return sorted
+}
+
+func severityRank(severity string) int {
+	switch strings.ToLower(severity) {
+	case llm.SeverityHigh:
+		return 0
+	case llm.SeverityMedium:
+		return 1
+	case llm.SeverityLow:
+		return 2
+	default:
+		return 3
+	}
 }
 
 // createDiscussionWithoutLine posts comments to a single discussion to Upsource without a link to a file and a line in it

@@ -18,16 +18,16 @@ func TestReviewValidate(t *testing.T) {
 		require.EqualError(t, r.Validate(), "review.maxPerReview is required")
 	})
 
-	t.Run("fails when system message is missing", func(t *testing.T) {
+	t.Run("fails when system message intro is missing", func(t *testing.T) {
 		r := validReview()
-		r.SystemMessage = ""
-		require.EqualError(t, r.Validate(), "review.systemMessage is required")
+		r.SystemMessageIntro = ""
+		require.EqualError(t, r.Validate(), "review.systemMessageIntro is required")
 	})
 
 	t.Run("fails when system message template is invalid", func(t *testing.T) {
 		r := validReview()
-		r.SystemMessage = "max %s"
-		require.EqualError(t, r.Validate(), "review.systemMessage is not a valid fmt template (expected maxPerReview placeholder like %d)")
+		r.SystemMessageGuidelines = "max 10"
+		require.EqualError(t, r.Validate(), "review.systemMessage is not a valid template (expected maxPerReview placeholder like {{max_per_review}})")
 	})
 
 	t.Run("fails when user prompt template is missing", func(t *testing.T) {
@@ -38,20 +38,17 @@ func TestReviewValidate(t *testing.T) {
 
 	t.Run("fails when user prompt template is invalid", func(t *testing.T) {
 		r := validReview()
-		r.UserPromptTemplate = "%d %d"
-		require.EqualError(t, r.Validate(), "review.userPromptTemplate is not a valid fmt template (expected placeholders for diff and commits comments)")
+		r.UserPromptTemplate = "diffs: {{diffs}}"
+		require.EqualError(t, r.Validate(), "review.userPromptTemplate is not a valid template (expected placeholder for messages like {{messages}})")
 	})
-}
-
-func TestContainsFmtError(t *testing.T) {
-	require.False(t, containsFmtError("ok"))
-	require.True(t, containsFmtError("value %!d(string=test)"))
 }
 
 func validReview() *Review {
 	return &Review{
-		MaxPerReview:       10,
-		SystemMessage:      "max %d",
-		UserPromptTemplate: "%s %s",
+		MaxPerReview:              10,
+		SystemMessageIntro:        "intro",
+		SystemMessageGuidelines:   "max {{max_per_review}}",
+		SystemMessageOutputFormat: "output",
+		UserPromptTemplate:        "diffs: {{diffs}}\nmessages: {{messages}}",
 	}
 }

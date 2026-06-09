@@ -25,8 +25,10 @@ gitlab:
 review:
   maxPerReview: 10
   postInLine: high
-  systemMessage: "max %d"
-  userPromptTemplate: "%s %s"
+  systemMessageIntro: "intro"
+  systemMessageGuidelines: "max {{max_per_review}}"
+  systemMessageOutputFormat: "output"
+  userPromptTemplate: "diffs: {{diffs}}\nmessages: {{messages}}"
 providers:
   openai:
     apiKey: key
@@ -189,9 +191,11 @@ func validConfig() *Config {
 			AccessToken: "token",
 		},
 		Review: Review{
-			MaxPerReview:       10,
-			SystemMessage:      "max %d",
-			UserPromptTemplate: "%s %s",
+			MaxPerReview:              10,
+			SystemMessageIntro:        "intro",
+			SystemMessageGuidelines:   "max {{max_per_review}}",
+			SystemMessageOutputFormat: "output",
+			UserPromptTemplate:        "diffs: {{diffs}}\nmessages: {{messages}}",
 		},
 		Providers: Providers{
 			OpenAI: OpenAI{
