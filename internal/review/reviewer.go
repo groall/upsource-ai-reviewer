@@ -164,6 +164,8 @@ func (r *Reviewer) listReviews() ([]*upsource.Review, error) {
 
 // postComments posts review comments to Upsource, splitting high severity comments into separate discussions if configured.
 func (r *Reviewer) postComments(review *upsource.Review, comments []*llm.ReviewComment) error {
+	comments = sortAndCapComments(comments, r.config.Review.MaxPerReview)
+
 	var postInOneComments []*llm.ReviewComment
 	var inlineComments []*llm.ReviewComment
 
