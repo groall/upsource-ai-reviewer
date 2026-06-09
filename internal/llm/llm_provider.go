@@ -24,9 +24,7 @@ type PrefixCacheProvider interface {
 }
 
 // createLLMProvider creates an LLM provider based on the configuration.
-func createLLMProvider(ctx context.Context, cfg *config.Config) (Provider, error) {
-	providers := cfg.Providers
-
+func createLLMProvider(ctx context.Context, providers config.Providers) (Provider, error) {
 	switch providers.ActiveLLMProvider() {
 	case config.ProviderAgent:
 		provider, err := pkgllm.NewAgentCompletion(ctx, &pkgllm.AgentConfig{

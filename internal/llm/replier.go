@@ -9,7 +9,6 @@ import (
 
 	"github.com/groall/upsource-ai-reviewer/internal/git"
 	"github.com/groall/upsource-ai-reviewer/internal/metrics"
-	"github.com/groall/upsource-ai-reviewer/pkg/config"
 	"github.com/groall/upsource-ai-reviewer/pkg/upsource"
 	"github.com/groall/upsource-go-client/client"
 )
@@ -17,26 +16,26 @@ import (
 type Replier struct {
 	llmProvider Provider
 	gitProvider git.Provider
-	config      *config.Config
+	cfg         ReplyConfig
 }
 
-type reviewReplier struct {
+type ReviewReplier struct {
 	replier     *Replier
 	review      *upsource.Review
 	codeContext string
 	loaded      bool
 }
 
-func NewReplier(reviewer *Reviewer) *Replier {
+func NewReplier(reviewer *Reviewer, cfg ReplyConfig) *Replier {
 	return &Replier{
 		llmProvider: reviewer.llmProvider,
 		gitProvider: reviewer.gitProvider,
-		config:      reviewer.config,
+		cfg:         cfg,
 	}
 }
 
-func (r *Replier) ForReview(review *upsource.Review) *reviewReplier {
-	return &reviewReplier{
+func (r *Replier) ForReview(review *upsource.Review) *ReviewReplier {
+	return &ReviewReplier{
 		replier: r,
 		review:  review,
 	}
@@ -68,8 +67,8 @@ func (r *Replier) Reply(review *upsource.Review, d client.DiscussionInFileDTO, b
 	return r.ForReview(review).Reply(d, botUserID)
 }
 
-func (rr *reviewReplier) Reply(d client.DiscussionInFileDTO, botUserID string) (*ReplyResult, error) {
-	if rr.replier.config.Replies.SystemMessage == "" {
+func (rr *ReviewReplier) Reply(d client.DiscussionInFileDTO, botUserID string) (*ReplyResult, error) {
+	if rr.replier.cfg.SystemMessage == "" {
 		return nil, fmt.Errorf("replies.systemMessage is not configured")
 	}
 
@@ -90,19 +89,19 @@ func (rr *reviewReplier) Reply(d client.DiscussionInFileDTO, botUserID string) (
 	var llmErr error
 	if prefix != "" {
 		if p, ok := rr.replier.llmProvider.(PrefixCacheProvider); ok {
-			replyText, llmErr = p.CompletionWithPrefixCache(prefix, suffix, rr.replier.config.Replies.SystemMessage)
+			replyText, llmErr = p.CompletionWithPrefixCache(prefix, suffix, rr.replier.cfg.SystemMessage)
 			if llmErr != nil {
 				log.Printf("Prefix-cache reply failed, retrying without prefix cache: %v", llmErr)
-				replyText, llmErr = rr.replier.complete(userPrompt, rr.replier.config.Replies.SystemMessage)
+				replyText, llmErr = rr.replier.complete(userPrompt, rr.replier.cfg.SystemMessage)
 			}
 		} else {
-			replyText, llmErr = rr.replier.complete(userPrompt, rr.replier.config.Replies.SystemMessage)
+			replyText, llmErr = rr.replier.complete(userPrompt, rr.replier.cfg.SystemMessage)
 		}
 	} else {
-		replyText, llmErr = rr.replier.complete(userPrompt, rr.replier.config.Replies.SystemMessage)
+		replyText, llmErr = rr.replier.complete(userPrompt, rr.replier.cfg.SystemMessage)
 	}
 	if llmErr != nil {
-		metrics.DefaultRecorder.RecordLLMError(metrics.OperationReply, rr.replier.config.Providers.ActiveLLMProvider())
+		metrics.DefaultRecorder.RecordLLMError(metrics.OperationReply, rr.replier.cfg.ActiveProvider)
 		return nil, fmt.Errorf("LLM reply request failed: %w", llmErr)
 	}
 
@@ -124,7 +123,7 @@ func (r *Replier) complete(userPrompt, systemPrompt string) (string, error) {
 	return r.llmProvider.Completion(userPrompt, systemPrompt)
 }
 
-func (rr *reviewReplier) loadCodeContext() (string, error) {
+func (rr *ReviewReplier) loadCodeContext() (string, error) {
 	if rr.loaded {
 		return rr.codeContext, nil
 	}

@@ -16,20 +16,20 @@ import (
 type Reviewer struct {
 	llmProvider Provider
 	gitProvider git.Provider
-	config      *config.Config
+	cfg         ReviewConfig
 	ctx         context.Context
 }
 
 // New creates a new LLM Reviewer instance.
-func New(ctx context.Context, cfg *config.Config, gitProvider git.Provider) (*Reviewer, error) {
+func New(ctx context.Context, cfg ReviewConfig, providers config.Providers, gitProvider git.Provider) (*Reviewer, error) {
 	reviewer := &Reviewer{
-		config:      cfg,
+		cfg:         cfg,
 		ctx:         ctx,
 		gitProvider: gitProvider,
 	}
 
 	var err error
-	reviewer.llmProvider, err = createLLMProvider(ctx, cfg)
+	reviewer.llmProvider, err = createLLMProvider(ctx, providers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create LLM provider: %w", err)
 	}
@@ -45,15 +45,15 @@ func (c *Reviewer) Do(review *upsource.Review) ([]*ReviewComment, error) {
 	}
 
 	// Build a concise prompt and send to OpenAI-compatible API using SDK
-	prompt := fmt.Sprintf(c.config.Review.UserPromptTemplate, changes, commitsComments)
+	prompt := fmt.Sprintf(c.cfg.UserPromptTemplate, changes, commitsComments)
 
-	systemMessage := fmt.Sprintf(c.config.Review.SystemMessage, c.config.Review.MaxPerReview)
+	systemMessage := fmt.Sprintf(c.cfg.SystemMessage, c.cfg.MaxPerReview)
 
 	log.Print("Sending prompt to LLM...")
 
 	llmResponse, err := c.complete(prompt, systemMessage)
 	if err != nil {
-		metrics.DefaultRecorder.RecordLLMError(metrics.OperationReview, c.config.Providers.ActiveLLMProvider())
+		metrics.DefaultRecorder.RecordLLMError(metrics.OperationReview, c.cfg.ActiveProvider)
 		return nil, fmt.Errorf("LLM request failed: %w", err)
 	}
 	log.Printf("Received LLM response: %s\n", llmResponse)

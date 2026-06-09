@@ -54,15 +54,14 @@ func TestReplyFallsBackWhenPrefixCacheFails(t *testing.T) {
 	reviewer := &Reviewer{
 		llmProvider: provider,
 		gitProvider: gitProvider,
-		config: &config.Config{
-			Replies: config.Replies{
-				SystemMessage: "reply system",
-			},
-		},
-		ctx: context.Background(),
+		cfg:         ReviewConfig{},
+		ctx:         context.Background(),
 	}
 
-	replier := NewReplier(reviewer).ForReview(&upsource.Review{})
+	replier := NewReplier(reviewer, ReplyConfig{
+		SystemMessage:  "reply system",
+		ActiveProvider: config.ProviderOpenAI,
+	}).ForReview(&upsource.Review{})
 
 	result, err := replier.Reply(
 		client.DiscussionInFileDTO{
@@ -88,15 +87,14 @@ func TestReplyReturnsErrorWhenPrefixAndFallbackFail(t *testing.T) {
 	reviewer := &Reviewer{
 		llmProvider: provider,
 		gitProvider: gitProvider,
-		config: &config.Config{
-			Replies: config.Replies{
-				SystemMessage: "reply system",
-			},
-		},
-		ctx: context.Background(),
+		cfg:         ReviewConfig{},
+		ctx:         context.Background(),
 	}
 
-	replier := NewReplier(reviewer).ForReview(&upsource.Review{})
+	replier := NewReplier(reviewer, ReplyConfig{
+		SystemMessage:  "reply system",
+		ActiveProvider: config.ProviderOpenAI,
+	}).ForReview(&upsource.Review{})
 
 	result, err := replier.Reply(
 		client.DiscussionInFileDTO{

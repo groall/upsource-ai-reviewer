@@ -41,11 +41,23 @@ func New(ctx context.Context, config *config.Config) (*Reviewer, error) {
 		return nil, fmt.Errorf("failed to create GitLab provider: %w", err)
 	}
 
-	llmReviewer, err := llm.New(ctx, config, gitlabProvider)
+	activeProvider := config.Providers.ActiveLLMProvider()
+	llmReviewerCfg := llm.ReviewConfig{
+		UserPromptTemplate: config.Review.UserPromptTemplate,
+		SystemMessage:      config.Review.SystemMessage,
+		MaxPerReview:       config.Review.MaxPerReview,
+		ActiveProvider:     activeProvider,
+	}
+	llmReviewer, err := llm.New(ctx, llmReviewerCfg, config.Providers, gitlabProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create LLM reviewer: %w", err)
 	}
-	llmReplier := llm.NewReplier(llmReviewer)
+
+	llmReplierCfg := llm.ReplyConfig{
+		SystemMessage:  config.Replies.SystemMessage,
+		ActiveProvider: activeProvider,
+	}
+	llmReplier := llm.NewReplier(llmReviewer, llmReplierCfg)
 
 	replierConfig := &replierConfig{
 		reviewedLabel:      config.Upsource.ReviewedLabel,
