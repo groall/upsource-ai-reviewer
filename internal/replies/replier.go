@@ -103,6 +103,20 @@ func (r *Replier) replyInReview(review *upsource.Review, botUserID string) error
 		return nil
 	}
 
+	shouldReply := false
+	for _, d := range discussions {
+		_, ok := upsource.ShouldReplyToDiscussion(d, r.config.reviewedLabel, botUserID, r.config.maxPerThread)
+		if ok {
+			shouldReply = true
+			break
+		}
+	}
+
+	if !shouldReply {
+		log.Printf("Skipping the review as there are no unanswered discussions")
+		return nil
+	}
+
 	err = r.generator.prepareReview(review)
 	if err != nil {
 		return fmt.Errorf("prepare review: %w", err)
