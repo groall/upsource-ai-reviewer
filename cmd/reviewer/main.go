@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/groall/upsource-ai-reviewer/internal/metrics"
+	"github.com/groall/upsource-ai-reviewer/internal/replies"
 	"github.com/groall/upsource-ai-reviewer/internal/review"
 	"github.com/groall/upsource-ai-reviewer/pkg/config"
 )
@@ -38,14 +39,26 @@ func main() {
 		log.Fatalf("Failed to start metrics server: %v", err)
 	}
 
-	reviewer, err := review.New(ctx, appConfig)
-	if err != nil {
-		log.Fatalf("Failed to create reviewer: %v", err)
-	}
-
 	// Setup signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	go runReviewer(ctx, appConfig)
+	go runReplier(ctx, appConfig)
+
+	select {
+	case sig := <-sigChan:
+		log.Printf("Received signal %v, shutting down gracefully...", sig)
+		cancel()
+		return
+	}
+}
+
+func runReviewer(ctx context.Context, appConfig *config.Config) {
+	reviewer, err := review.NewReviewer(ctx, appConfig)
+	if err != nil {
+		log.Fatalf("Failed to create reviewer: %v", err)
+	}
 
 	// Get polling interval from config
 	interval := time.Duration(appConfig.Polling.IntervalSeconds) * time.Second
@@ -67,9 +80,45 @@ func main() {
 			if err := reviewer.Run(); err != nil {
 				log.Printf("Error during review: %v", err)
 			}
-		case sig := <-sigChan:
-			log.Printf("Received signal %v, shutting down gracefully...", sig)
-			cancel()
+		case <-ctx.Done():
+			log.Printf("Shutting down AI Reviewer service...")
+			return
+		}
+	}
+}
+
+func runReplier(ctx context.Context, appConfig *config.Config) {
+	if !appConfig.Replies.Enabled {
+		return
+	}
+
+	reviewer, err := replies.NewReplier(ctx, appConfig)
+	if err != nil {
+		log.Fatalf("Failed to create replier: %v", err)
+	}
+
+	// Get polling interval from config
+	interval := time.Duration(appConfig.Polling.IntervalSeconds) * time.Second
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	log.Printf("Starting AI Replier service (polling every %v)...", interval)
+
+	// Run immediately on startup
+	if err := reviewer.Run(); err != nil {
+		log.Printf("Error during review: %v", err)
+	}
+
+	// Run the reviewer in a loop
+	for {
+		select {
+		case <-ticker.C:
+			log.Println("Checking for new discussions...")
+			if err := reviewer.Run(); err != nil {
+				log.Printf("Error during replying: %v", err)
+			}
+		case <-ctx.Done():
+			log.Printf("Shutting down AI Replier service...")
 			return
 		}
 	}

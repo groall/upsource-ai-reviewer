@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/groall/upsource-ai-reviewer/pkg/config"
-	pkgllm "github.com/groall/upsource-ai-reviewer/pkg/llm"
 )
 
 // Provider is an interface for LLM completion providers.
@@ -14,7 +13,7 @@ type Provider interface {
 }
 
 // PrefixCacheProvider is an optional extension interface for providers that can
-// cache a stable prefix of the user prompt independently from the suffix.
+// cache a stable prefix of the user prompt independently of the suffix.
 //
 // Implementations should treat userPromptPrefix as the cacheable part and
 // userPromptSuffix as non-cacheable.
@@ -23,21 +22,11 @@ type PrefixCacheProvider interface {
 	CompletionWithPrefixCache(userPromptPrefix, userPromptSuffix, systemPrompt string) (string, error)
 }
 
-// createLLMProvider creates an LLM provider based on the configuration.
-func createLLMProvider(ctx context.Context, providers config.Providers) (Provider, error) {
-	switch providers.ActiveLLMProvider() {
-	case config.ProviderAgent:
-		provider, err := pkgllm.NewAgentCompletion(ctx, &pkgllm.AgentConfig{
-			Command:        providers.Agent.Command,
-			Workdir:        providers.Agent.Workdir,
-			RequestTimeout: providers.Agent.RequestTimeout,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create Agent client: %w", err)
-		}
-		return provider, nil
+// CreateLLMProvider creates an LLM provider based on the configuration and a specific provider ID if provided.
+func CreateLLMProvider(ctx context.Context, providers config.Providers, providerID string) (Provider, error) {
+	switch providerID {
 	case config.ProviderOpenAI:
-		provider, err := pkgllm.NewOpenAICompletion(ctx, &pkgllm.OpenAIConfig{
+		provider, err := NewOpenAICompletion(ctx, &OpenAIConfig{
 			APIKey:         providers.OpenAI.APIKey,
 			Endpoint:       providers.OpenAI.Endpoint,
 			Model:          providers.OpenAI.Model,
@@ -50,7 +39,7 @@ func createLLMProvider(ctx context.Context, providers config.Providers) (Provide
 		}
 		return provider, nil
 	case config.ProviderGemini:
-		provider, err := pkgllm.NewGeminiCompletion(ctx, &pkgllm.GeminiConfig{
+		provider, err := NewGeminiCompletion(ctx, &GeminiConfig{
 			APIKey:         providers.Gemini.APIKey,
 			Model:          providers.Gemini.Model,
 			MaxTokens:      int32(providers.Gemini.MaxTokens),
@@ -61,7 +50,7 @@ func createLLMProvider(ctx context.Context, providers config.Providers) (Provide
 		}
 		return provider, nil
 	case config.ProviderAnthropic:
-		provider, err := pkgllm.NewAnthropicCompletion(ctx, &pkgllm.AnthropicConfig{
+		provider, err := NewAnthropicCompletion(ctx, &AnthropicConfig{
 			APIKey:         providers.Anthropic.APIKey,
 			Model:          providers.Anthropic.Model,
 			MaxTokens:      providers.Anthropic.MaxTokens,

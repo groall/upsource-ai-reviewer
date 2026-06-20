@@ -1,0 +1,9 @@
+[profiles.reviewer]
+model = "gpt-5.5"
+model_provider = "openai"
+
+approval_policy = "never"
+sandbox_mode = "read-only"
+
+model_reasoning_effort = "medium"
+model_verbosity = "low"

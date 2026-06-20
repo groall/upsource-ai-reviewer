@@ -1,7 +1,7 @@
-package llm
+package review
 
-// ReviewComment matches the JSON structure we requested from the LLM.
-type ReviewComment struct {
+// reviewComment matches the JSON structure we requested from the LLM.
+type reviewComment struct {
 	FilePath     string `json:"filePath"`     // Path to the file where the comment is made.
 	LineNumber   int    `json:"lineNumber"`   // Line number in the file where the comment is made.
 	LineVerified bool   `json:"lineVerified"` // Whether the line in the file is verified or not.

@@ -20,55 +20,75 @@ main.go (ticker)
        ├─ review pass (new MRs)
        │    ├─ pkg/upsource             ListReviews() — filter by reviewedLabel / invitationLabel
        │    ├─ internal/git/gitlab.go   GetReviewChanges() — fetch diff via GitLab branch compare
-       │    ├─ internal/llm/reviewer.go Reviewer.Do() — format prompt, call LLM, parse JSON
-       │    │    └─ internal/llm/llm_provider.go  createLLMProvider() — pick provider from config
-       │    │         └─ pkg/llm/       openai.go | gemini.go | anthropic.go | codex.go
+       │    ├─ internal/review/generator.go      iCommentGenerator.generate() — format prompt, call LLM, parse JSON
+       │    │    ├─ internal/review/agentic_generator.go  — agent mode: clone repo + run agent CLI
+       │    │    └─ pkg/llm/                     CreateLLMProvider() — pick SDK provider from config
+       │    │         └─ openai.go | gemini.go | anthropic.go | codex.go
        │    └─ pkg/upsource             CreateDiscussion() — post inline or general comments
        └─ reply pass (open threads)
             ├─ pkg/upsource             ListReviewedReviews() — reviews already labelled reviewedLabel
             ├─ pkg/upsource             ListReviewDiscussions() — discussions for one review
             ├─ pkg/upsource             ShouldReplyToDiscussion() — label + not-resolved + last-author + bot-cap
-            ├─ internal/llm/replier.go  Reviewer.Reply() — plain-prose reply via the same LLM provider
-            └─ pkg/upsource             AddDiscussionComment() — threaded reply to the last comment
+            ├─ internal/replies/replier.go  Replier.Reply() — threaded replies to discussions
+            │    ├─ internal/replies/generator.go         — LLM reply generation
+            │    └─ internal/replies/review_reply_generator.go  — build discussion context, call generator
+            └─ pkg/upsource             AddDiscussionComment() — post threaded reply to the last comment
 ```
 
 ## Directory Structure
 
 ```
-cmd/reviewer/main.go           entry point, config load, signal handling
-pkg/config/config.go           Config struct, LoadConfig, ValidateConfig
-pkg/llm/                       LLM provider implementations
-pkg/upsource/                  Upsource API client (reviews, discussions, reply predicate)
-internal/review/reviewer.go    main orchestration loop
-internal/review/replier.go     reply pass — scan reviewed reviews, post follow-up replies
-internal/llm/reviewer.go       prompt formatting, LLM call, JSON parsing
-internal/llm/replier.go        reply-shaped LLM call (plain prose, no JSON)
-internal/llm/llm_provider.go   provider factory
-internal/llm/comment.go        ReviewComment struct, severity constants
-internal/llm/diff_validator.go validateCommentsAgainstDiff — line number verification
-internal/git/gitlab.go         GitLab diff fetching
-config.yaml.example            reference configuration
+cmd/reviewer/main.go              entry point, config load, signal handling
+configs/                          configuration examples (claude-settings.json, codex.config.toml, reviewer.config.yaml)
+pkg/config/                       configuration parsing and validation
+pkg/llm/                          LLM provider implementations (openai, gemini, anthropic, codex)
+pkg/llm/provider.go               provider factory — CreateLLMProvider()
+pkg/upsource/                     Upsource API client (reviews, discussions, reply predicate)
+pkg/upsource/client.go            Upsource HTTP client wrapper
+internal/review/                  code review generation
+  reviewer.go                     main orchestration loop, Reviewer.Run()
+  generator.go                    comment generation interface & SDK-based implementation
+  agentic_generator.go            agent mode — clone repo + run agent CLI
+  comment.go                       ReviewComment struct, severity constants
+  diff_validator.go               validateCommentsAgainstDiff — line number verification
+internal/replies/                 discussion reply generation
+  replier.go                      reply orchestration, Replier.Reply()
+  generator.go                    LLM-based reply generation
+  review_reply_generator.go        build discussion context + call generator
+internal/git/gitlab.go            GitLab diff fetching
+internal/metrics/metrics.go       metric recording
 ```
 
 ## LLM Provider Selection
 
-Priority order in `createLLMProvider()`: **Agent → OpenAI → Gemini → Anthropic**.
+Priority order in `pkg/llm.CreateLLMProvider()`: **Agent → OpenAI → Gemini → Anthropic**.
 Only one provider is active per run, determined by which API key / command is set.
 At least one must be configured or startup fails.
 
+### Agentic mode
+
+When `review.activeProvider: agent`, the review runs in fully agentic mode
+(`internal/review/agentic_generator.go`): for each review the repo is cloned at its
+branch into a fresh dir under `agent.cloneDir` (or the OS temp dir) and the
+agent command runs with that clone as its working directory, so an agentic CLI
+can explore the real code. The diff is still passed in the prompt; the command
+must read the prompt from stdin and print the JSON `ReviewComment` array to
+stdout. The clone is removed after the run. Requires `git` on the host. SDK
+providers (OpenAI/Gemini/Anthropic) keep the stateless diff-in-prompt flow.
+
 ## Configuration Overview
 
-| Section     | Key fields |
-|-------------|---|
-| `polling`   | `intervalSeconds` |
-| `review`    | `maxPerReview`, `postInLine` (high / mid / low / none), `systemMessageIntro`, `systemMessageGuidelines`, `systemMessageOutputFormat`, `userPromptTemplate` |
-| `upsource`  | `baseUrl`, `username`, `password`, `query`, `reviewedLabel`, `invitationLabel` |
-| `gitlab`    | `baseUrl`, `accessToken` |
-| `openai`    | `apiKey`, `endpoint`, `model`, `maxTokens`, `temperature`, `requestTimeout` |
-| `gemini`    | `apiKey`, `model`, `maxTokens` |
-| `anthropic` | `apiKey`, `model`, `maxTokens`, `requestTimeout` |
-| `agent`     | `command`, `workdir`, `requestTimeout` |
-| `replies`   | `enabled`, `maxPerThread`, `systemMessage` |
+| Section     | Key fields                                                                                                                          |
+|-------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| `polling`   | `intervalSeconds`                                                                                                                   |
+| `review`    | `maxPerReview`, `activeProvider`, `systemMessageIntro`, `systemMessageGuidelines`, `systemMessageOutputFormat`, `userPromptTemplate` |
+| `upsource`  | `baseUrl`, `username`, `password`, `query`, `reviewedLabel`, `invitationLabel`                                                      |
+| `gitlab`    | `baseUrl`, `accessToken`                                                                                                            |
+| `openai`    | `apiKey`, `endpoint`, `model`, `maxTokens`, `temperature`, `requestTimeout`                                                         |
+| `gemini`    | `apiKey`, `model`, `maxTokens`                                                                                                      |
+| `anthropic` | `apiKey`, `model`, `maxTokens`, `requestTimeout`                                                                                    |
+| `agent`     | `command`, `cloneDir`, `requestTimeout`                                                                                             |
+| `replies`   | `enabled`, `maxPerThread`, `activeProvider`, `systemMessage`                                                                         |
 
 ## Review Flow
 
@@ -95,7 +115,7 @@ Runs after the review pass on every tick.
    - last comment was **not** from the bot
    - bot has authored fewer than `replies.maxPerThread` comments in the thread
 5. Lazily fetch the review diff once per review when at least one discussion qualifies
-6. Build a thread transcript + diff context, call `Reviewer.Reply` (plain prose)
+6. Build a thread transcript + diff context via `reviewReplyGenerator`, call `generator.reply()` (plain prose)
 7. Empty response ⇒ skip posting (the LLM may choose silence on "ok/thanks")
 8. Otherwise post via `AddDiscussionComment` with `parentId` = last comment's id
 
@@ -103,10 +123,10 @@ Idempotency comes from "the last comment in the thread is from the AI user" — 
 
 ## Comment Posting
 
-Comments are split into two groups based on `review.postInLine`:
+Comments are sorted by severity and capped to `review.maxPerReview`, then split into two groups:
 
-* **Inline** — severity meets the threshold AND `lineVerified=true` AND `lineNumber > 0`; posted as individual per-line Upsource discussions
-* **General** — remaining comments batched into one discussion formatted as `### Low-Medium Priority Comments (AI generated)`
+* **Inline** — `lineVerified=true` AND `lineNumber > 0` AND `filePath` is set; posted as individual per-line Upsource discussions
+* **General** — remaining comments (no line info or unverified lines); batched into one discussion
 
 ## LLM Response Format
 

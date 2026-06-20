@@ -10,7 +10,6 @@ import (
 	"github.com/groall/upsource-go-client/client"
 
 	"github.com/groall/upsource-ai-reviewer/internal/git"
-	"github.com/groall/upsource-ai-reviewer/internal/llm"
 	"github.com/groall/upsource-ai-reviewer/internal/metrics"
 	"github.com/groall/upsource-ai-reviewer/pkg/config"
 	"github.com/groall/upsource-ai-reviewer/pkg/upsource"
@@ -18,63 +17,49 @@ import (
 
 // Reviewer is responsible for reviewing code changes in Upsource using AI models.
 type Reviewer struct {
-	upsourceClient *client.Client
-	config         *config.Config
-	ctx            context.Context
-	llmReviewer    *llm.Reviewer
-	replier        *replier
+	upsourceClient   *client.Client
+	config           *config.Config
+	ctx              context.Context
+	commentGenerator iCommentGenerator
 }
 
-// New creates a new Reviewer instance.
-func New(ctx context.Context, config *config.Config) (*Reviewer, error) {
-	upsourceClient, err := client.New(client.Options{
-		BaseURL:  config.Upsource.BaseURL,
-		Username: config.Upsource.Username,
-		Password: config.Upsource.Password,
-	})
+// NewReviewer creates a new Reviewer instance.
+func NewReviewer(ctx context.Context, appConfig *config.Config) (*Reviewer, error) {
+	upsourceClient, err := upsource.NewClient(appConfig.Upsource.BaseURL, appConfig.Upsource.Username, appConfig.Upsource.Password)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Upsource client: %w", err)
 	}
 
-	gitlabProvider, err := git.NewGitlabProvider(config)
+	gitlabProvider, err := git.NewGitlabProvider(&appConfig.Gitlab)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GitLab provider: %w", err)
 	}
 
-	activeProvider := config.Providers.ActiveLLMProvider()
-	llmReviewerCfg := llm.ReviewConfig{
-		UserPromptTemplate: config.Review.UserPromptTemplate,
-		SystemMessage:      config.Review.SystemMessageTemplate(),
-		MaxPerReview:       config.Review.MaxPerReview,
-		ActiveProvider:     activeProvider,
-	}
-	llmReviewer, err := llm.New(ctx, llmReviewerCfg, config.Providers, gitlabProvider)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create LLM reviewer: %w", err)
+	generatorCfg := generatorConfig{
+		userPromptTemplate: appConfig.Review.UserPromptTemplate,
+		systemMessage:      appConfig.Review.SystemMessageTemplate(),
+		maxPerReview:       appConfig.Review.MaxPerReview,
+		activeProvider:     appConfig.Review.ActiveProvider,
 	}
 
-	llmReplierCfg := llm.ReplyConfig{
-		SystemMessage:  config.Replies.SystemMessage,
-		ActiveProvider: activeProvider,
-	}
-	llmReplier := llm.NewReplier(llmReviewer, llmReplierCfg)
-
-	replierConfig := &replierConfig{
-		reviewedLabel:      config.Upsource.ReviewedLabel,
-		maxPerThread:       config.Replies.MaxPerThread,
-		searchReviewsQuery: config.Upsource.Query,
-	}
-	replier, err := newReplier(ctx, replierConfig, upsourceClient, llmReplier)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create replier: %w", err)
+	var cmtGenerator iCommentGenerator
+	if appConfig.Review.ActiveProvider == config.ProviderAgent {
+		cmtGenerator, err = newAgenticGenerator(ctx, generatorCfg, appConfig.Providers.Agent, gitlabProvider)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create agentic LLM reviewer: %w", err)
+		}
+	} else {
+		cmtGenerator, err = newGenerator(ctx, generatorCfg, appConfig.Providers, gitlabProvider)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create LLM reviewer: %w", err)
+		}
 	}
 
 	return &Reviewer{
-		upsourceClient: upsourceClient,
-		llmReviewer:    llmReviewer,
-		replier:        replier,
-		config:         config,
-		ctx:            ctx,
+		upsourceClient:   upsourceClient,
+		commentGenerator: cmtGenerator,
+		config:           appConfig,
+		ctx:              ctx,
 	}, nil
 }
 
@@ -84,10 +69,10 @@ func (r *Reviewer) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to list reviews: %w", err)
 	}
-	projects, reviewsByProject := groupReviewsByProject(reviews)
+	projects, reviewsByProject := upsource.GroupReviewsByProject(reviews)
 	log.Printf("Found %d reviews to process across %d projects.\n", len(reviews), len(projects))
 
-	var comments []*llm.ReviewComment
+	var comments []*reviewComment
 	for _, projectID := range projects {
 		projectReviews := reviewsByProject[projectID]
 		sort.Slice(projectReviews, func(i, j int) bool {
@@ -102,7 +87,7 @@ func (r *Reviewer) Run() error {
 			}
 
 			if len(comments) == 0 {
-				log.Printf("AI Reviewer found no issues to comment on for %s.\n", review.GetBranch())
+				log.Printf("AI commentGenerator found no issues to comment on for %s.\n", review.GetBranch())
 				continue
 			}
 
@@ -112,34 +97,13 @@ func (r *Reviewer) Run() error {
 		}
 	}
 
-	if r.config.Replies.Enabled {
-		if err := r.replier.replyToOpenThreads(); err != nil {
-			log.Printf("Error during thread replies: %v", err)
-		}
-	}
-
 	return nil
 }
 
-func groupReviewsByProject(reviews []*upsource.Review) ([]string, map[string][]*upsource.Review) {
-	byProject := make(map[string][]*upsource.Review)
-	for _, review := range reviews {
-		projectID := review.GetProjectID()
-		byProject[projectID] = append(byProject[projectID], review)
-	}
-
-	projects := make([]string, 0, len(byProject))
-	for projectID := range byProject {
-		projects = append(projects, projectID)
-	}
-	sort.Strings(projects)
-	return projects, byProject
-}
-
-func (r *Reviewer) doReview(review *upsource.Review) ([]*llm.ReviewComment, error) {
+func (r *Reviewer) doReview(review *upsource.Review) ([]*reviewComment, error) {
 	log.Printf("Processing review for the branch %s.\n", review.GetBranch())
 
-	comments, err := r.llmReviewer.Do(review)
+	comments, err := r.commentGenerator.generate(review)
 	if err != nil {
 		return nil, fmt.Errorf("error getting review comments for %s: %w", review.GetBranch(), err)
 	}
@@ -163,11 +127,11 @@ func (r *Reviewer) listReviews() ([]*upsource.Review, error) {
 }
 
 // postComments posts review comments to Upsource, splitting high severity comments into separate discussions if configured.
-func (r *Reviewer) postComments(review *upsource.Review, comments []*llm.ReviewComment) error {
+func (r *Reviewer) postComments(review *upsource.Review, comments []*reviewComment) error {
 	comments = sortAndCapComments(comments, r.config.Review.MaxPerReview)
 
-	var postInOneComments []*llm.ReviewComment
-	var inlineComments []*llm.ReviewComment
+	var postInOneComments []*reviewComment
+	var inlineComments []*reviewComment
 
 	for _, comment := range comments {
 		thereIsLine := comment.LineNumber > 0 && comment.FilePath != "" && comment.LineVerified
@@ -195,12 +159,12 @@ func (r *Reviewer) postComments(review *upsource.Review, comments []*llm.ReviewC
 }
 
 // sortAndCapComments sorts and caps comments.
-func sortAndCapComments(comments []*llm.ReviewComment, maxPerReview int) []*llm.ReviewComment {
+func sortAndCapComments(comments []*reviewComment, maxPerReview int) []*reviewComment {
 	if len(comments) == 0 {
 		return nil
 	}
 
-	sorted := append([]*llm.ReviewComment(nil), comments...)
+	sorted := append([]*reviewComment(nil), comments...)
 	sort.SliceStable(sorted, func(i, j int) bool {
 		a := sorted[i]
 		b := sorted[j]
@@ -235,11 +199,11 @@ func sortAndCapComments(comments []*llm.ReviewComment, maxPerReview int) []*llm.
 
 func severityRank(severity string) int {
 	switch strings.ToLower(severity) {
-	case llm.SeverityHigh:
+	case SeverityHigh:
 		return 0
-	case llm.SeverityMedium:
+	case SeverityMedium:
 		return 1
-	case llm.SeverityLow:
+	case SeverityLow:
 		return 2
 	default:
 		return 3
@@ -247,7 +211,7 @@ func severityRank(severity string) int {
 }
 
 // createDiscussionWithoutLine posts comments to a single discussion to Upsource without a link to a file and a line in it
-func (r *Reviewer) createDiscussionWithoutLine(comments []*llm.ReviewComment, review *upsource.Review) error {
+func (r *Reviewer) createDiscussionWithoutLine(comments []*reviewComment, review *upsource.Review) error {
 	discussionText := generateLowPriorityComment(comments)
 	if len(discussionText) > 0 {
 		err := upsource.CreateDiscussion(r.ctx, r.upsourceClient, r.config.Upsource.ReviewedLabel, upsource.CreateDiscussionRequest{
@@ -266,7 +230,7 @@ func (r *Reviewer) createDiscussionWithoutLine(comments []*llm.ReviewComment, re
 }
 
 // createDiscussion posts a single discussion to Upsource.
-func (r *Reviewer) createDiscussion(comment *llm.ReviewComment, review *upsource.Review) error {
+func (r *Reviewer) createDiscussion(comment *reviewComment, review *upsource.Review) error {
 	err := upsource.CreateDiscussion(r.ctx, r.upsourceClient, r.config.Upsource.ReviewedLabel, upsource.CreateDiscussionRequest{
 		Review:  review,
 		Comment: comment.Comment,
@@ -282,7 +246,7 @@ func (r *Reviewer) createDiscussion(comment *llm.ReviewComment, review *upsource
 }
 
 // generateLowPriorityComment creates a formatted string for low and medium priority comments.
-func generateLowPriorityComment(comments []*llm.ReviewComment) string {
+func generateLowPriorityComment(comments []*reviewComment) string {
 	var commentsBuilder strings.Builder
 	commentsBuilder.WriteString("### Low-Medium Priority Comments (AI generated):\n\n")
 

@@ -39,7 +39,7 @@ In addition, when `replies.enabled` is set, the bot scans the discussions it pre
 
 ## Configuration
 
-The application is configured using a YAML file. An example of the `config.yaml` file you can find in `configs/config.example.yaml`.
+The application is configured using a YAML file. An example of the `config.yaml` file you can find in `configs/reviewer.config.yaml`.
 You can copy this file and modify it according to your needs.
 
-The main review behavior is configured under the `review` section (prompt templates plus `maxPerReview` and `postInLine`).
+The main review behavior is configured under the `review` section.

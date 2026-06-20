@@ -25,10 +25,6 @@ type OpenAICompletion struct {
 }
 
 func NewOpenAICompletion(ctx context.Context, cfg *OpenAIConfig) (*OpenAICompletion, error) {
-	if cfg.APIKey == "" {
-		return nil, fmt.Errorf("OpenAI API key is required")
-	}
-
 	c := openai.DefaultConfig(cfg.APIKey)
 	c.BaseURL = normalizeOpenAIBaseURL(cfg.Endpoint)
 	openAIClient := openai.NewClientWithConfig(c)

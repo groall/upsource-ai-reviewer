@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/url"
 	"path"
+	"sort"
 	"strings"
 
 	"github.com/groall/upsource-go-client/client"
@@ -267,4 +268,20 @@ func AddReviewLabel(ctx context.Context, upsourceClient *client.Client, review *
 	})
 
 	return err
+}
+
+// GroupReviewsByProject groups reviews by project ID.
+func GroupReviewsByProject(reviews []*Review) ([]string, map[string][]*Review) {
+	byProject := make(map[string][]*Review)
+	for _, review := range reviews {
+		projectID := review.GetProjectID()
+		byProject[projectID] = append(byProject[projectID], review)
+	}
+
+	projects := make([]string, 0, len(byProject))
+	for projectID := range byProject {
+		projects = append(projects, projectID)
+	}
+	sort.Strings(projects)
+	return projects, byProject
 }

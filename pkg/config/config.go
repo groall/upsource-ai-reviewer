@@ -7,6 +7,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// Config is the root configuration loaded from YAML.
 type Config struct {
 	Upsource  Upsource  `yaml:"upsource"`
 	Gitlab    Gitlab    `yaml:"gitlab"`
@@ -17,28 +18,27 @@ type Config struct {
 	Metrics   Metrics   `yaml:"metrics"`
 }
 
+// Metrics controls the optional Prometheus metrics endpoint.
 type Metrics struct {
 	Enabled       bool   `yaml:"enabled"`
 	ListenAddress string `yaml:"listenAddress"`
 	Path          string `yaml:"path"`
 }
 
-type Replies struct {
-	Enabled       bool   `yaml:"enabled"`
-	MaxPerThread  int    `yaml:"maxPerThread"`
-	SystemMessage string `yaml:"systemMessage"`
-}
-
+// Polling controls how often Upsource is polled for reviews.
 type Polling struct {
 	IntervalSeconds int `yaml:"intervalSeconds"`
 }
 
+// Gitlab contains connection details used to fetch diffs from GitLab.
 type Gitlab struct {
 	BaseURL     string `yaml:"baseUrl"`
 	AccessToken string `yaml:"accessToken"`
 }
 
-// LoadConfig reads and parses the configuration YAML file
+// LoadConfig reads a YAML file and unmarshals it into a Config.
+//
+// LoadConfig does not validate values; call ValidateConfig after loading.
 func LoadConfig(filename string) (*Config, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -54,6 +54,7 @@ func LoadConfig(filename string) (*Config, error) {
 	return config, nil
 }
 
+// ValidateConfig validates configuration values and applies defaults in-place.
 func ValidateConfig(config *Config) error {
 	if config == nil {
 		return fmt.Errorf("config is nil")
@@ -61,10 +62,6 @@ func ValidateConfig(config *Config) error {
 
 	if err := config.Upsource.Validate(); err != nil {
 		return fmt.Errorf("upsource config is invalid: %w", err)
-	}
-
-	if err := config.Providers.Validate(); err != nil {
-		return fmt.Errorf("providers config is invalid: %w", err)
 	}
 
 	if config.Gitlab.BaseURL == "" {
@@ -82,6 +79,9 @@ func ValidateConfig(config *Config) error {
 	if err := config.Review.Validate(); err != nil {
 		return fmt.Errorf("review config is invalid: %w", err)
 	}
+	if err := config.Replies.Validate(); err != nil {
+		return fmt.Errorf("replies config is invalid: %w", err)
+	}
 
 	if config.Metrics.Enabled {
 		if config.Metrics.ListenAddress == "" {
@@ -92,13 +92,8 @@ func ValidateConfig(config *Config) error {
 		}
 	}
 
-	if config.Replies.Enabled {
-		if config.Replies.MaxPerThread <= 0 {
-			return fmt.Errorf("replies.maxPerThread must be > 0 when replies.enabled is true")
-		}
-		if config.Replies.SystemMessage == "" {
-			return fmt.Errorf("replies.systemMessage is required when replies.enabled is true")
-		}
+	if err := config.Providers.Validate(config.Review.ActiveProvider, config.Replies.ActiveProvider); err != nil {
+		return fmt.Errorf("providers config is invalid: %w", err)
 	}
 
 	return nil

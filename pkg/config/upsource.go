@@ -2,6 +2,7 @@ package config
 
 import "fmt"
 
+// Upsource contains Upsource connection details and review discovery settings.
 type Upsource struct {
 	BaseURL         string `yaml:"baseUrl"`
 	Username        string `yaml:"username"`
@@ -11,6 +12,7 @@ type Upsource struct {
 	InvitationLabel string `yaml:"invitationLabel"`
 }
 
+// Validate validates required Upsource configuration fields.
 func (u *Upsource) Validate() error {
 	if u.BaseURL == "" {
 		return fmt.Errorf("upsource.baseUrl is required")

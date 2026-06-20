@@ -2,12 +2,10 @@ package review
 
 import (
 	"testing"
-
-	"github.com/groall/upsource-ai-reviewer/internal/llm"
 )
 
 func TestSortAndCapComments(t *testing.T) {
-	comments := []*llm.ReviewComment{
+	comments := []*reviewComment{
 		{Severity: "medium", FilePath: "b.go", LineNumber: 2, LineVerified: true, Comment: "m1"},
 		{Severity: "high", FilePath: "a.go", LineNumber: 0, LineVerified: false, Comment: "h0"},
 		{Severity: "HIGH", FilePath: "a.go", LineNumber: 10, LineVerified: true, Comment: "h1"},

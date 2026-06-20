@@ -3,8 +3,11 @@
 vendor/
 /config.yaml
 /upsource_ai_reviewer
+/reviewer
 .env
 /.codex/
 /.mcp.json
 /.claude/
 /.agents/
+/repos/
+/opencode.json

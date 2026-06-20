@@ -1,4 +1,4 @@
-package llm
+package review
 
 import (
 	"regexp"
@@ -8,7 +8,7 @@ import (
 // validateCommentsAgainstDiff checks whether each LLM-reported location points at
 // an added line in the provided unified diff. Comments that cannot be placed
 // inline are downgraded by clearing LineVerified and zeroing LineNumber.
-func validateCommentsAgainstDiff(diff string, comments []*ReviewComment) []*ReviewComment {
+func validateCommentsAgainstDiff(diff string, comments []*reviewComment) []*reviewComment {
 	if diff == "" || len(comments) == 0 {
 		return comments
 	}

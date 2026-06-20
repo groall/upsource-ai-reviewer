@@ -63,6 +63,81 @@ func TestUpsourceValidate(t *testing.T) {
 	}
 }
 
+func TestUpsourceValidateAcceptsWhitespace(t *testing.T) {
+	t.Run("accepts baseUrl with whitespace", func(t *testing.T) {
+		u := validUpsource()
+		u.BaseURL = "   https://upsource.example   "
+		require.NoError(t, u.Validate())
+	})
+
+	t.Run("accepts username with whitespace", func(t *testing.T) {
+		u := validUpsource()
+		u.Username = "   user   "
+		require.NoError(t, u.Validate())
+	})
+
+	t.Run("accepts password with whitespace", func(t *testing.T) {
+		u := validUpsource()
+		u.Password = "   password   "
+		require.NoError(t, u.Validate())
+	})
+
+	t.Run("accepts query with whitespace", func(t *testing.T) {
+		u := validUpsource()
+		u.Query = "   state: open   "
+		require.NoError(t, u.Validate())
+	})
+
+	t.Run("accepts reviewedLabel with whitespace", func(t *testing.T) {
+		u := validUpsource()
+		u.ReviewedLabel = "   AI-Reviewed   "
+		require.NoError(t, u.Validate())
+	})
+}
+
+func TestUpsourceValidateWithVaryingValues(t *testing.T) {
+	t.Run("succeeds with various valid URLs", func(t *testing.T) {
+		urls := []string{
+			"https://upsource.example",
+			"http://upsource.example:8080",
+			"https://upsource.example/path",
+		}
+		for _, url := range urls {
+			u := validUpsource()
+			u.BaseURL = url
+			require.NoError(t, u.Validate())
+		}
+	})
+
+	t.Run("succeeds with various queries", func(t *testing.T) {
+		queries := []string{
+			"state: open",
+			"state: OPEN AND author:user",
+			"created: today",
+			"resolved: false",
+		}
+		for _, query := range queries {
+			u := validUpsource()
+			u.Query = query
+			require.NoError(t, u.Validate())
+		}
+	})
+
+	t.Run("succeeds with various labels", func(t *testing.T) {
+		labels := []string{
+			"AI-Reviewed",
+			"reviewed",
+			"AI_REVIEWED_v2",
+			"label-with-dashes",
+		}
+		for _, label := range labels {
+			u := validUpsource()
+			u.ReviewedLabel = label
+			require.NoError(t, u.Validate())
+		}
+	})
+}
+
 func validUpsource() *Upsource {
 	return &Upsource{
 		BaseURL:       "https://upsource.example",

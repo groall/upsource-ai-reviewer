@@ -30,7 +30,7 @@ func TestIsGeminiCachedContentInvalidError(t *testing.T) {
 	})
 
 	t.Run("matches cached-content invalid message", func(t *testing.T) {
-		err := errors.New("Error 400, Message: CachedContent is invalid or expired")
+		err := errors.New("error 400, Message: CachedContent is invalid or expired")
 		require.True(t, isGeminiCachedContentInvalidError(err))
 	})
 

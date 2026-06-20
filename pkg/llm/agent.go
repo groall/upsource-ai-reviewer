@@ -11,7 +11,6 @@ import (
 
 type AgentConfig struct {
 	Command        string
-	Workdir        string
 	RequestTimeout time.Duration
 }
 
@@ -20,7 +19,7 @@ type AgentCompletion struct {
 	config AgentConfig
 }
 
-func NewAgentCompletion(ctx context.Context, cfg *AgentConfig) (*AgentCompletion, error) {
+func NewAgentRunner(ctx context.Context, cfg *AgentConfig) (*AgentCompletion, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("agent config is required")
 	}
@@ -35,8 +34,8 @@ func NewAgentCompletion(ctx context.Context, cfg *AgentConfig) (*AgentCompletion
 	}, nil
 }
 
-// Completion executes a local CLI command, piping the prompts via STDIN.
-func (c *AgentCompletion) Completion(userPrompt, systemPrompt string) (string, error) {
+// Run executes a local CLI command, piping the prompts via STDIN.
+func (c *AgentCompletion) Run(userPrompt, systemPrompt, pathToRepo string) (string, error) {
 	execCtx, cancel := withRequestTimeout(c.ctx, c.config.RequestTimeout)
 	defer cancel()
 
@@ -44,16 +43,14 @@ func (c *AgentCompletion) Completion(userPrompt, systemPrompt string) (string, e
 
 	cmd := exec.CommandContext(execCtx, "bash", "-lc", c.config.Command)
 	cmd.Stdin = strings.NewReader(combinedPrompt)
-	if c.config.Workdir != "" {
-		cmd.Dir = c.config.Workdir
-	}
+	cmd.Dir = pathToRepo
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("command failed: %w: %s", err, strings.TrimSpace(stderr.String()))
+		return "", fmt.Errorf("command failed: %w: %s (stdout: %s)", err, strings.TrimSpace(stderr.String()), stdout.String())
 	}
 
 	output := strings.TrimSpace(stdout.String())

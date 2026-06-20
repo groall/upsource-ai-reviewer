@@ -4,12 +4,6 @@
 polling:
   intervalSeconds: 60  # How often to check for new reviews
 
-# Provider selection priority:
-# 1) providers.agent.command (if set)
-# 2) providers.openai.apiKey
-# 3) providers.gemini.apiKey
-# 4) providers.anthropic.apiKey
-
 metrics:
   enabled: true
   listenAddress: ":2112"
@@ -17,6 +11,7 @@ metrics:
 
 replies:
   enabled: true            # Reply to humans who responded in threads the bot started
+  activeProvider: "openai"     # Use specific provider for replies (optional, defaults to active provider)
   maxPerThread: 3          # Hard cap on bot replies per thread
   systemMessage: |
     You are an AI code reviewer continuing an existing review discussion.
@@ -68,7 +63,7 @@ replies:
 
 providers:
   gemini:
-#    apiKey: "***"
+    apiKey: "***"
     model: "gemini-2.5-flash"
     maxTokens: 0
     requestTimeout: 300s
@@ -83,15 +78,24 @@ providers:
     requestTimeout: 300s
 
   anthropic:
-#    apiKey: "sk-ant-****"
+    apiKey: "sk-ant-****"
     model: "claude-opus-4-7"
     maxTokens: 0
     requestTimeout: 300s
 
   agent:
-#    command: "/usr/bin/codex exec -" # Command that reads prompt from stdin and writes response to stdout
-#    workdir: "" # optional working directory for the Codex command
-#    requestTimeout: 300s
+    # When the agent provider is active the review runs in fully agentic mode:
+    # the review's repo is cloned at its branch and the command runs with that
+    # clone as its working directory, so an agentic CLI can explore the real code.
+    # The command must read the prompt (incl. the diff) from stdin and print the
+    # JSON ReviewComment array to stdout. Requires `git` on the host.
+#    command: "CODEX_HOME=/var/lib/upsource-ai-reviewer/codex codex exec --profile reviewer -" # Command that reads prompt from stdin and writes response to stdout
+    command: "HOME=/var/lib/upsource-ai-reviewer/claude-home claude -p --output-format text --permission-mode dontAsk 
+      --settings /var/lib/upsource-ai-reviewer/claude-reviewer-settings.json 
+      --mcp-config /var/lib/upsource-ai-reviewer/claude-mcp.json --strict-mcp-config 
+      'Return only the JSON array requested in the piped input.'"
+    cloneDir: "" # base dir for per-review clones; empty uses the OS temp dir
+    requestTimeout: 300s
 
 upsource:
   baseUrl: "https://upsource.com"
@@ -106,6 +110,7 @@ gitlab:
   accessToken: "glpat-***"
 
 review:
+  activeProvider: "gemini"     # Use specific provider for review (optional, defaults to active provider)
   maxPerReview: 10  # Maximum number of comments per review
   systemMessageIntro: |
     You are Code Reviewer, an AI specializing in diffs code analysis and suggestions.
@@ -185,8 +190,8 @@ review:
   userPromptTemplate: |
     ### Diff:
 
-    %s
+    {{diffs}}
 
     ### Commit messages:
 
-    %s
+    {{messages}}

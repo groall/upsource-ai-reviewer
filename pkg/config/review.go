@@ -5,8 +5,19 @@ import (
 	"strings"
 )
 
+// MaxPerReviewPlaceholder must appear in review system message templates.
+const MaxPerReviewPlaceholder = "{{max_per_review}}"
+
+// DiffsPlaceholder must appear in review.userPromptTemplate.
+const DiffsPlaceholder = "{{diffs}}"
+
+// MessagesPlaceholder must appear in review.userPromptTemplate.
+const MessagesPlaceholder = "{{messages}}"
+
+// Review controls the review prompt templates and posting limits.
 type Review struct {
-	MaxPerReview int `yaml:"maxPerReview"`
+	ActiveProvider string `yaml:"activeProvider"`
+	MaxPerReview   int    `yaml:"maxPerReview"`
 
 	// SystemMessage is a legacy, single-block system message template for reviews.
 	// Prefer the split fields below.
@@ -20,9 +31,19 @@ type Review struct {
 	UserPromptTemplate string `yaml:"userPromptTemplate"`
 }
 
+// Validate validates the review configuration and required template placeholders.
 func (r *Review) Validate() error {
 	if r.MaxPerReview == 0 {
 		return fmt.Errorf("review.maxPerReview is required")
+	}
+
+	// Validate Review Provider if set (not strictly required to have a providerId, but must be valid if provided)
+	if r.ActiveProvider != "" {
+		if err := CheckProviderByID(r.ActiveProvider); err != nil {
+			return fmt.Errorf("review %w", err)
+		}
+	} else {
+		return fmt.Errorf("review.activeProvider is required")
 	}
 
 	if r.usesSplitSystemMessage() {
@@ -56,6 +77,7 @@ func (r *Review) Validate() error {
 	return nil
 }
 
+// SystemMessageTemplate returns the combined system message template for reviews.
 func (r *Review) SystemMessageTemplate() string {
 	if !r.usesSplitSystemMessage() {
 		return r.SystemMessage
@@ -74,13 +96,13 @@ func (r *Review) usesSplitSystemMessage() bool {
 }
 
 func containsMaxPerReviewPlaceholder(s string) bool {
-	return strings.Contains(s, "{{max_per_review}}")
+	return strings.Contains(s, MaxPerReviewPlaceholder)
 }
 
 func containsDiffsPlaceholder(s string) bool {
-	return strings.Contains(s, "{{diffs}}")
+	return strings.Contains(s, DiffsPlaceholder)
 }
 
 func containsMessagesPlaceholder(s string) bool {
-	return strings.Contains(s, "{{messages}}")
+	return strings.Contains(s, MessagesPlaceholder)
 }
