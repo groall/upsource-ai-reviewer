@@ -58,8 +58,8 @@ func (g *agenticCommentGenerator) generate(review *upsource.Review) ([]*reviewCo
 		return nil, fmt.Errorf("failed to clone review %s: %w", review.GetBranch(), err)
 	}
 
-	userPrompt := buildSystemPrompt(g.cfg.systemMessage, g.cfg.maxPerReview)
-	systemPrompt := buildUserPrompt(g.cfg.userPromptTemplate, changes, commitsComments)
+	systemPrompt := buildSystemPrompt(g.cfg.systemMessage, g.cfg.maxPerReview)
+	userPrompt := buildUserPrompt(g.cfg.userPromptTemplate, changes, commitsComments)
 
 	log.Printf("Running agent in %s...", cloneDir)
 
