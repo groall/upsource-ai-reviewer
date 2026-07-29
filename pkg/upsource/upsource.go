@@ -104,7 +104,7 @@ func ListReviews(ctx context.Context, upsourceClient *client.Client, query strin
 
 	for _, review := range upsourceReviews.Reviews {
 		if len(review.Branch) == 0 {
-			log.Printf("Skipping review %s because it has no branch\n", review.Title)
+			//log.Printf("Skipping review %s because it has no branch\n", review.Title)
 			continue
 		}
 
@@ -117,7 +117,7 @@ func ListReviews(ctx context.Context, upsourceClient *client.Client, query strin
 		}
 
 		if skip {
-			log.Printf("Skipping review %s already AI-reviewed.\n", review.Title)
+			//log.Printf("Skipping review %s already AI-reviewed.\n", review.Title)
 			continue
 		}
 
@@ -134,7 +134,7 @@ func ListReviews(ctx context.Context, upsourceClient *client.Client, query strin
 		}
 
 		if !isInvited {
-			log.Printf("Skipping review %s as the AI reviewer is not invited.\n", review.Title)
+			//log.Printf("Skipping review %s as the AI reviewer is not invited.\n", review.Title)
 			continue
 		}
 
