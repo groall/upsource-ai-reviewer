@@ -82,7 +82,7 @@ func (r *Reviewer) Run() error {
 
 		for _, review := range projectReviews {
 			if comments, err = r.doReview(review); err != nil {
-				log.Printf("Error processing review %s: %v\n", review.GetBranch(), err)
+				log.Printf("Error processing review %s: %v\n", review.GetReviewID(), err)
 				continue
 			}
 
@@ -92,7 +92,7 @@ func (r *Reviewer) Run() error {
 			}
 
 			if err := r.postComments(review, comments); err != nil {
-				log.Printf("Error posting comments for review %s: %v\n", review.GetBranch(), err)
+				log.Printf("Error posting comments for review %s: %v\n", review.GetReviewID(), err)
 			}
 		}
 	}
@@ -101,11 +101,11 @@ func (r *Reviewer) Run() error {
 }
 
 func (r *Reviewer) doReview(review *upsource.Review) ([]*reviewComment, error) {
-	log.Printf("Processing review for the branch %s.\n", review.GetBranch())
+	log.Printf("Processing review %s for the branch %s.\n", review.GetReviewID(), review.GetBranch())
 
 	comments, err := r.commentGenerator.generate(review)
 	if err != nil {
-		return nil, fmt.Errorf("error getting review comments for %s: %w", review.GetBranch(), err)
+		return nil, fmt.Errorf("error getting review comments for %s: %w", review.GetReviewID(), err)
 	}
 
 	if err := upsource.AddReviewLabel(r.ctx, r.upsourceClient, review, r.config.Upsource.ReviewedLabel); err != nil {
@@ -151,7 +151,7 @@ func (r *Reviewer) postComments(review *upsource.Review, comments []*reviewComme
 
 	if len(postInOneComments) > 0 {
 		if err := r.createDiscussionWithoutLine(postInOneComments, review); err != nil {
-			return fmt.Errorf("failed to post comments to review %s: %w", review.GetBranch(), err)
+			return fmt.Errorf("failed to post comments: %w", err)
 		}
 	}
 
