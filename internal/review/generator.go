@@ -58,8 +58,8 @@ func (c *commentGenerator) generate(review *upsource.Review) ([]*reviewComment, 
 		return nil, fmt.Errorf("error getting review changes for %s: %w", review.GetBranch(), err)
 	}
 
-	userPrompt := buildSystemPrompt(c.cfg.systemMessage, c.cfg.maxPerReview)
-	systemPrompt := buildUserPrompt(c.cfg.userPromptTemplate, changes, commitsComments)
+	systemPrompt := buildSystemPrompt(c.cfg.systemMessage, c.cfg.maxPerReview)
+	userPrompt := buildUserPrompt(c.cfg.userPromptTemplate, changes, commitsComments)
 
 	log.Print("Sending prompt to LLM...")
 
