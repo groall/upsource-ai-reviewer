@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/groall/upsource-go-client/client"
@@ -62,7 +63,7 @@ func ResolveDiscussion(ctx context.Context, upsourceClient *client.Client, proje
 //   - has at least one comment
 //   - the most recent comment was not authored by the bot
 //   - the bot has authored fewer than maxPerThread comments in this thread
-func ShouldReplyToDiscussion(d client.DiscussionInFileDTO, reviewedLabel, botUserID string, maxPerThread int) (client.CommentDTO, bool) {
+func ShouldReplyToDiscussion(d client.DiscussionInFileDTO, reviewedLabel, botUserID string, maxPerThread int, botNickname ...string) (client.CommentDTO, bool) {
 	var zero client.CommentDTO
 
 	var hasLabel bool
@@ -72,7 +73,8 @@ func ShouldReplyToDiscussion(d client.DiscussionInFileDTO, reviewedLabel, botUse
 			break
 		}
 	}
-	if !hasLabel {
+	mentioned := len(botNickname) > 0 && containsUserMention(d.Comments, botNickname[0], botUserID)
+	if !hasLabel && !mentioned {
 		return zero, false
 	}
 
@@ -100,6 +102,71 @@ func ShouldReplyToDiscussion(d client.DiscussionInFileDTO, reviewedLabel, botUse
 	}
 
 	return last, true
+}
+
+// containsUserMention reports whether a human comment mentions the bot's
+// nickname. Upsource renders mentions as @{userID,nickname}; plain @nickname
+// mentions are also accepted. Matching is case-insensitive and rejects longer
+// usernames that merely start with the configured nickname.
+func containsUserMention(comments []client.CommentDTO, nickname, botUserID string) bool {
+	nickname = strings.TrimPrefix(strings.TrimSpace(nickname), "@")
+	if nickname == "" {
+		return false
+	}
+
+	want := "@" + strings.ToLower(nickname)
+	for _, comment := range comments {
+		if comment.AuthorID == botUserID {
+			continue
+		}
+		text := strings.ToLower(comment.Text)
+		if containsStructuredUserMention(text, nickname) {
+			return true
+		}
+		for start := 0; ; {
+			offset := strings.Index(text[start:], want)
+			if offset < 0 {
+				break
+			}
+			offset += start
+			end := offset + len(want)
+			// A username may continue with letters, digits, dots, underscores, or
+			// hyphens; punctuation such as a comma terminates the mention.
+			if end == len(text) || !isMentionContinuation(rune(text[end])) {
+				return true
+			}
+			start = offset + 1
+		}
+	}
+	return false
+}
+
+// containsStructuredUserMention matches Upsource's @{userID,nickname} syntax.
+func containsStructuredUserMention(text, nickname string) bool {
+	want := strings.ToLower(strings.TrimSpace(nickname))
+	for start := 0; ; {
+		offset := strings.Index(text[start:], "@{")
+		if offset < 0 {
+			return false
+		}
+		start += offset + 2
+		end := strings.IndexByte(text[start:], '}')
+		if end < 0 {
+			return false
+		}
+		end += start
+		mention := text[start:end]
+		comma := strings.LastIndexByte(mention, ',')
+		if comma >= 0 && strings.TrimSpace(mention[comma+1:]) == want {
+			return true
+		}
+		start = end + 1
+	}
+}
+
+// isMentionContinuation reports whether r can be part of a username suffix.
+func isMentionContinuation(r rune) bool {
+	return r == '_' || r == '-' || r == '.' || unicode.IsLetter(r) || unicode.IsNumber(r)
 }
 
 type CreateDiscussionRequest struct {

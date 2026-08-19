@@ -111,6 +111,39 @@ func TestShouldReplyToDiscussion(t *testing.T) {
 	}
 }
 
+func TestShouldReplyToDiscussionMention(t *testing.T) {
+	const (
+		botID = "bot-1"
+		label = "AI-Reviewed"
+		login = "ai-reviewer"
+	)
+
+	tests := []struct {
+		name string
+		text string
+		from string
+		want bool
+	}{
+		{name: "direct mention", text: "@ai-reviewer please check this", from: "human", want: true},
+		{name: "Upsource structured mention", text: "@{79f4656f-ed63-40dc-901f-98495402fbee,ai-reviewer} проверь лексику здесь", from: "human", want: true},
+		{name: "case insensitive", text: "Could @AI-REVIEWER review this?", from: "human", want: true},
+		{name: "terminal punctuation", text: "@ai-reviewer, please check", from: "human", want: true},
+		{name: "hyphenated longer login", text: "@ai-reviewer-dev please check", from: "human", want: false},
+		{name: "dotted longer login", text: "@ai-reviewer.dev please check", from: "human", want: false},
+		{name: "bot mention ignored", text: "@ai-reviewer test", from: botID, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := client.DiscussionInFileDTO{Comments: []client.CommentDTO{{AuthorID: tt.from, Text: tt.text}}}
+			_, got := ShouldReplyToDiscussion(d, label, botID, 3, login)
+			if got != tt.want {
+				t.Fatalf("ShouldReplyToDiscussion() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func Test_findRangeInFileContent(t *testing.T) {
 	type args struct {
 		fileContent string

@@ -19,6 +19,7 @@ type Replier struct {
 	ctx            context.Context
 	generator      *reviewReplyGenerator
 	botUserID      string
+	botNickname    string
 }
 
 type config struct {
@@ -58,20 +59,19 @@ func NewReplier(ctx context.Context, appConfig *appConfig.Config) (*Replier, err
 	return replier, nil
 }
 
-// Run scans reviews the bot has already engaged with and posts a
-// follow-up reply in any thread where a human spoke after the bot's last word.
+// Run scans matching open reviews and posts a follow-up reply in eligible discussions.
 // Errors are logged per discussion / per review; a single failure never aborts the loop.
 func (r *Replier) Run() error {
-	botUserID, err := r.resolveBotUserID()
+	botUserID, _, err := r.resolveBotIdentity()
 	if err != nil {
 		return fmt.Errorf("failed to resolve bot user id: %w", err)
 	}
 
 	r.generator.setBotUserID(botUserID)
 
-	reviews, err := upsource.ListReviewedReviews(r.ctx, r.upsourceClient, r.config.searchReviewsQuery, r.config.reviewedLabel)
+	reviews, err := upsource.ListOpenReviews(r.ctx, r.upsourceClient, r.config.searchReviewsQuery)
 	if err != nil {
-		return fmt.Errorf("failed to list reviewed reviews: %w", err)
+		return fmt.Errorf("failed to list open reviews: %w", err)
 	}
 
 	projects, reviewsByProject := upsource.GroupReviewsByProject(reviews)
@@ -103,17 +103,16 @@ func (r *Replier) replyInReview(review *upsource.Review, botUserID string) error
 		return nil
 	}
 
-	shouldReply := false
+	discussionsToReply := discussions[0:0]
 	for _, d := range discussions {
-		_, ok := upsource.ShouldReplyToDiscussion(d, r.config.reviewedLabel, botUserID, r.config.maxPerThread)
+		_, ok := upsource.ShouldReplyToDiscussion(d, r.config.reviewedLabel, botUserID, r.config.maxPerThread, r.botNickname)
 		if ok {
-			shouldReply = true
-			break
+			discussionsToReply = append(discussionsToReply, d)
 		}
 	}
 
-	if !shouldReply {
-		log.Printf("Replier: skipping the review %s as there are no unanswered discussions", review.GetTitle())
+	if len(discussionsToReply) == 0 {
+		log.Printf("Replier: skipping the review %s as there are no unanswered discussions and there are no mentions", review.GetTitle())
 		return nil
 	}
 
@@ -122,13 +121,7 @@ func (r *Replier) replyInReview(review *upsource.Review, botUserID string) error
 		return fmt.Errorf("prepare review: %w", err)
 	}
 
-	for _, d := range discussions {
-		last, ok := upsource.ShouldReplyToDiscussion(d, r.config.reviewedLabel, botUserID, r.config.maxPerThread)
-		if !ok {
-			//log.Printf("Skipping discussion %s in review %s\n", d.DiscussionID, review.GetBranch())
-			continue
-		}
-
+	for _, d := range discussionsToReply {
 		reply, lerr := r.generator.reply(d)
 		if lerr != nil {
 			log.Printf("Replier: replier: failed to get reply for discussion %s: %v\n", d.DiscussionID, lerr)
@@ -156,16 +149,20 @@ func (r *Replier) replyInReview(review *upsource.Review, botUserID string) error
 	return nil
 }
 
-func (r *Replier) resolveBotUserID() (string, error) {
-	if r.botUserID != "" {
-		return r.botUserID, nil
+func (r *Replier) resolveBotIdentity() (string, string, error) {
+	if r.botUserID != "" && r.botNickname != "" {
+		return r.botUserID, r.botNickname, nil
 	}
 
 	user, err := r.upsourceClient.GetCurrentUser(r.ctx)
 	if err != nil {
-		return "", err
+		return "", "", err
+	}
+	if user.UserID == "" || user.Login == "" {
+		return "", "", fmt.Errorf("current user has empty user id or login")
 	}
 	r.botUserID = user.UserID
+	r.botNickname = user.Login
 
-	return r.botUserID, nil
+	return r.botUserID, r.botNickname, nil
 }

@@ -50,6 +50,15 @@ func (r *Review) GetTitle() string {
 // ListReviewedReviews lists open reviews that already carry reviewedLabel.
 // Mirror of ListReviews used by the reply pass to find threads the bot may need to follow up on.
 func ListReviewedReviews(ctx context.Context, upsourceClient *client.Client, query string, reviewedLabel string) ([]*Review, error) {
+	return listOpenReviews(ctx, upsourceClient, query, reviewedLabel, true)
+}
+
+// ListOpenReviews lists open reviews matching query, including unlabelled reviews.
+func ListOpenReviews(ctx context.Context, upsourceClient *client.Client, query string) ([]*Review, error) {
+	return listOpenReviews(ctx, upsourceClient, query, "", false)
+}
+
+func listOpenReviews(ctx context.Context, upsourceClient *client.Client, query, reviewedLabel string, reviewedOnly bool) ([]*Review, error) {
 	upsourceReviews, err := upsourceClient.GetReviews(ctx, client.ReviewsRequestDTO{
 		Limit: 10000,
 		Query: query,
@@ -68,15 +77,17 @@ func ListReviewedReviews(ctx context.Context, upsourceClient *client.Client, que
 			continue
 		}
 
-		var hasLabel bool
-		for _, label := range review.Labels {
-			if label.Name == reviewedLabel {
-				hasLabel = true
-				break
+		if reviewedOnly {
+			var hasLabel bool
+			for _, label := range review.Labels {
+				if label.Name == reviewedLabel {
+					hasLabel = true
+					break
+				}
 			}
-		}
-		if !hasLabel {
-			continue
+			if !hasLabel {
+				continue
+			}
 		}
 
 		reviewItem, err := newReviewFromUpsourceReview(ctx, review, upsourceClient)

@@ -102,11 +102,11 @@ func runReplier(ctx context.Context, appConfig *config.Config) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	log.Printf("Starting AI Replier service (polling every %v)...", interval)
+	log.Printf("Starting Replier service (polling every %v)...", interval)
 
 	// Run immediately on startup
 	if err := reviewer.Run(); err != nil {
-		log.Printf("Error during review: %v", err)
+		log.Printf("Replier: error during review: %v", err)
 	}
 
 	// Run the reviewer in a loop
