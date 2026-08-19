@@ -107,6 +107,7 @@ func (g *GitlabProvider) PrepareReviewRepo(review Review, baseDir string) (strin
 		return "", fmt.Errorf("failed to create clone parent directory: %w", err)
 	}
 	if out, err := runGit("", args...); err != nil {
+		log.Printf("git clone failed: %v; command output: %s", err, out)
 		return "", fmt.Errorf("git clone failed: %w: %s", err, out)
 	}
 

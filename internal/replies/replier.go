@@ -75,18 +75,18 @@ func (r *Replier) Run() error {
 	}
 
 	projects, reviewsByProject := upsource.GroupReviewsByProject(reviews)
-	log.Printf("Reply pass: scanning %d already-reviewed reviews across %d projects\n", len(reviews), len(projects))
+	log.Printf("Replier: pass: scanning %d already-reviewed reviews across %d projects\n", len(reviews), len(projects))
 
 	for _, projectID := range projects {
 		projectReviews := reviewsByProject[projectID]
 		sort.Slice(projectReviews, func(i, j int) bool {
 			return projectReviews[i].GetBranch() < projectReviews[j].GetBranch()
 		})
-		log.Printf("Reply pass: processing %d reviews in project %s\n", len(projectReviews), projectID)
+		log.Printf("Replier: pass: processing %d reviews in project %s\n", len(projectReviews), projectID)
 
 		for _, review := range projectReviews {
 			if err := r.replyInReview(review, botUserID); err != nil {
-				log.Printf("Reply pass error in review %s: %v\n", review.GetBranch(), err)
+				log.Printf("Replier: reply pass error in review %s: %v\n", review.GetBranch(), err)
 			}
 		}
 	}
@@ -113,7 +113,7 @@ func (r *Replier) replyInReview(review *upsource.Review, botUserID string) error
 	}
 
 	if !shouldReply {
-		log.Printf("Skipping the review as there are no unanswered discussions")
+		log.Printf("Replier: skipping the review %s as there are no unanswered discussions", review.GetTitle())
 		return nil
 	}
 
@@ -131,25 +131,25 @@ func (r *Replier) replyInReview(review *upsource.Review, botUserID string) error
 
 		reply, lerr := r.generator.reply(d)
 		if lerr != nil {
-			log.Printf("Failed to get reply for discussion %s: %v\n", d.DiscussionID, lerr)
+			log.Printf("Replier: replier: failed to get reply for discussion %s: %v\n", d.DiscussionID, lerr)
 			continue
 		}
 
 		if reply.Comment != "" {
 			if err := upsource.AddDiscussionComment(r.ctx, r.upsourceClient, review.GetProjectID(), d.DiscussionID, last.CommentID, reply.Comment); err != nil {
-				log.Printf("Failed to post reply for discussion %s: %v\n", d.DiscussionID, err)
+				log.Printf("Replier: failed to post reply for discussion %s: %v\n", d.DiscussionID, err)
 				continue
 			}
 			metrics.DefaultRecorder.RecordReplySent()
-			log.Printf("Posted reply in discussion %s (review %s)\n", d.DiscussionID, review.GetBranch())
+			log.Printf("Replier: posted reply in discussion %s (review %s)\n", d.DiscussionID, review.GetBranch())
 		}
 
 		if reply.Close {
 			if err := upsource.ResolveDiscussion(r.ctx, r.upsourceClient, review.GetProjectID(), d.DiscussionID); err != nil {
-				log.Printf("Failed to resolve discussion %s: %v\n", d.DiscussionID, err)
+				log.Printf("Replier: failed to resolve discussion %s: %v\n", d.DiscussionID, err)
 				continue
 			}
-			log.Printf("Resolved discussion %s (review %s)\n", d.DiscussionID, review.GetBranch())
+			log.Printf("Replier: resolved discussion %s (review %s)\n", d.DiscussionID, review.GetBranch())
 		}
 	}
 
