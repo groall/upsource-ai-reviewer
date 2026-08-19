@@ -29,6 +29,8 @@ review:
   systemMessageGuidelines: "max {{max_per_review}}"
   systemMessageOutputFormat: "output"
   userPromptTemplate: "diffs: {{diffs}}\nmessages: {{messages}}"
+replies:
+  logMessages: true
 providers:
   openai:
     apiKey: key
@@ -45,6 +47,7 @@ polling:
 		require.Equal(t, "token", cfg.Gitlab.AccessToken)
 		require.Equal(t, "key", cfg.Providers.OpenAI.APIKey)
 		require.Equal(t, 60, cfg.Polling.IntervalSeconds)
+		require.True(t, cfg.Replies.LogMessages)
 	})
 
 	t.Run("returns error for missing file", func(t *testing.T) {

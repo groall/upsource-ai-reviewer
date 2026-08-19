@@ -11,6 +11,7 @@ metrics:
 
 replies:
   enabled: true            # Reply to humans who responded in threads the bot started
+  logMessages: false       # Emit replier log messages
   activeProvider: "openai"     # Use specific provider for replies (optional, defaults to active provider)
   maxPerThread: 3          # Hard cap on bot replies per thread
   systemMessage: |

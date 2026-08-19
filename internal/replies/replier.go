@@ -24,6 +24,7 @@ type Replier struct {
 
 type config struct {
 	reviewedLabel      string
+	logMessages        bool
 	maxPerThread       int
 	searchReviewsQuery string
 }
@@ -45,6 +46,7 @@ func NewReplier(ctx context.Context, appConfig *appConfig.Config) (*Replier, err
 
 	config := &config{
 		reviewedLabel:      appConfig.Upsource.ReviewedLabel,
+		logMessages:        appConfig.Replies.LogMessages,
 		maxPerThread:       appConfig.Replies.MaxPerThread,
 		searchReviewsQuery: appConfig.Upsource.Query,
 	}
@@ -75,18 +77,18 @@ func (r *Replier) Run() error {
 	}
 
 	projects, reviewsByProject := upsource.GroupReviewsByProject(reviews)
-	log.Printf("Replier: pass: scanning %d already-reviewed reviews across %d projects\n", len(reviews), len(projects))
+	r.logf("scanning %d reviews for discussions across %d projects", len(reviews), len(projects))
 
 	for _, projectID := range projects {
 		projectReviews := reviewsByProject[projectID]
 		sort.Slice(projectReviews, func(i, j int) bool {
 			return projectReviews[i].GetBranch() < projectReviews[j].GetBranch()
 		})
-		log.Printf("Replier: pass: processing %d reviews in project %s\n", len(projectReviews), projectID)
+		r.logf("processing %d reviews in project %s", len(projectReviews), projectID)
 
 		for _, review := range projectReviews {
 			if err := r.replyInReview(review, botUserID); err != nil {
-				log.Printf("Replier: reply pass error in review %s: %v\n", review.GetBranch(), err)
+				r.logf("reply error in review %s: %v", review.GetBranch(), err)
 			}
 		}
 	}
@@ -112,7 +114,7 @@ func (r *Replier) replyInReview(review *upsource.Review, botUserID string) error
 	}
 
 	if len(discussionsToReply) == 0 {
-		log.Printf("Replier: skipping the review %s as there are no unanswered discussions and there are no mentions", review.GetTitle())
+		r.logf("skipping the review %s as there are no unanswered discussions and there are no mentions", review.GetTitle())
 		return nil
 	}
 
@@ -124,29 +126,36 @@ func (r *Replier) replyInReview(review *upsource.Review, botUserID string) error
 	for _, d := range discussionsToReply {
 		reply, lerr := r.generator.reply(d)
 		if lerr != nil {
-			log.Printf("Replier: replier: failed to get reply for discussion %s: %v\n", d.DiscussionID, lerr)
+			r.logf("failed to get reply for discussion %s: %v", d.DiscussionID, lerr)
 			continue
 		}
 
 		if reply.Comment != "" {
+			last := d.Comments[len(d.Comments)-1]
 			if err := upsource.AddDiscussionComment(r.ctx, r.upsourceClient, review.GetProjectID(), d.DiscussionID, last.CommentID, reply.Comment); err != nil {
-				log.Printf("Replier: failed to post reply for discussion %s: %v\n", d.DiscussionID, err)
+				r.logf("failed to post reply for discussion %s: %v", d.DiscussionID, err)
 				continue
 			}
 			metrics.DefaultRecorder.RecordReplySent()
-			log.Printf("Replier: posted reply in discussion %s (review %s)\n", d.DiscussionID, review.GetBranch())
+			r.logf("posted reply in discussion %s (review %s)", d.DiscussionID, review.GetBranch())
 		}
 
 		if reply.Close {
 			if err := upsource.ResolveDiscussion(r.ctx, r.upsourceClient, review.GetProjectID(), d.DiscussionID); err != nil {
-				log.Printf("Replier: failed to resolve discussion %s: %v\n", d.DiscussionID, err)
+				r.logf("failed to resolve discussion %s: %v", d.DiscussionID, err)
 				continue
 			}
-			log.Printf("Replier: resolved discussion %s (review %s)\n", d.DiscussionID, review.GetBranch())
+			r.logf("resolved discussion %s (review %s)", d.DiscussionID, review.GetBranch())
 		}
 	}
 
 	return nil
+}
+
+func (r *Replier) logf(format string, args ...interface{}) {
+	if r.config.logMessages {
+		log.Printf("Replier: "+format, args...)
+	}
 }
 
 func (r *Replier) resolveBotIdentity() (string, string, error) {

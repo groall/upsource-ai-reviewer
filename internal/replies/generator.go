@@ -27,6 +27,7 @@ type replyResult struct {
 
 type generator struct {
 	llmProvider    llm.Provider
+	logMessages    bool
 	systemMessage  string
 	activeProvider string
 }
@@ -42,13 +43,16 @@ func newGenerator(ctx context.Context, cfg appConfig.Replies, providersCfg appCo
 
 	return &generator{
 		llmProvider:    provider,
+		logMessages:    cfg.LogMessages,
 		systemMessage:  cfg.SystemMessage,
 		activeProvider: cfg.ActiveProvider,
 	}, nil
 }
 
 func (g *generator) reply(prefix, suffix string) (*replyResult, error) {
-	log.Print("Sending reply prompt to LLM...")
+	if g.logMessages {
+		log.Print("Sending reply prompt to LLM...")
+	}
 
 	replyText, llmErr := g.completeWithCache(prefix, suffix)
 	if llmErr != nil {
@@ -86,7 +90,9 @@ func (g *generator) completeWithCache(prefix, suffix string) (string, error) {
 
 	replyText, llmErr := p.CompletionWithPrefixCache(prefix, suffix, g.systemMessage)
 	if llmErr != nil {
-		log.Printf("Prefix-cache reply failed, retrying without prefix cache: %v", llmErr)
+		if g.logMessages {
+			log.Printf("Prefix-cache reply failed, retrying without prefix cache: %v", llmErr)
+		}
 		return g.complete(prefix + suffix)
 	}
 

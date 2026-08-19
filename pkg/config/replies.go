@@ -6,6 +6,7 @@ import "fmt"
 type Replies struct {
 	ActiveProvider string `yaml:"activeProvider"`
 	Enabled        bool   `yaml:"enabled"`
+	LogMessages    bool   `yaml:"logMessages"`
 	MaxPerThread   int    `yaml:"maxPerThread"`
 	SystemMessage  string `yaml:"systemMessage"`
 }

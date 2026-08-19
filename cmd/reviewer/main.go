@@ -102,23 +102,33 @@ func runReplier(ctx context.Context, appConfig *config.Config) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	log.Printf("Starting Replier service (polling every %v)...", interval)
+	if appConfig.Replies.LogMessages {
+		log.Printf("Starting Replier service (polling every %v)...", interval)
+	}
 
 	// Run immediately on startup
 	if err := reviewer.Run(); err != nil {
-		log.Printf("Replier: error during review: %v", err)
+		if appConfig.Replies.LogMessages {
+			log.Printf("Replier: error during review: %v", err)
+		}
 	}
 
 	// Run the reviewer in a loop
 	for {
 		select {
 		case <-ticker.C:
-			log.Println("Checking for new discussions...")
+			if appConfig.Replies.LogMessages {
+				log.Println("Checking for new discussions...")
+			}
 			if err := reviewer.Run(); err != nil {
-				log.Printf("Error during replying: %v", err)
+				if appConfig.Replies.LogMessages {
+					log.Printf("Error during replying: %v", err)
+				}
 			}
 		case <-ctx.Done():
-			log.Printf("Shutting down AI Replier service...")
+			if appConfig.Replies.LogMessages {
+				log.Printf("Shutting down AI Replier service...")
+			}
 			return
 		}
 	}
