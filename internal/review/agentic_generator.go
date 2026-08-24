@@ -50,12 +50,12 @@ func newAgenticGenerator(ctx context.Context, cfg generatorConfig, agentCfg conf
 func (g *agenticCommentGenerator) generate(review *upsource.Review) ([]*reviewComment, error) {
 	changes, commitsComments, err := g.gitProvider.GetReviewChanges(review)
 	if err != nil {
-		return nil, fmt.Errorf("error getting review changes for %s: %w", review.GetBranch(), err)
+		return nil, fmt.Errorf("error getting review changes: %s", err)
 	}
 
 	cloneDir, err := g.gitProvider.PrepareReviewRepo(review, g.cloneDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to clone review %s: %w", review.GetBranch(), err)
+		return nil, fmt.Errorf("failed to clone review: %s", err)
 	}
 
 	systemPrompt := buildSystemPrompt(g.cfg.systemMessage, g.cfg.maxPerReview)
@@ -72,7 +72,7 @@ func (g *agenticCommentGenerator) generate(review *upsource.Review) ([]*reviewCo
 
 	comments, err := parsLLMResponse(llmResponse)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing llm response: %w", err)
 	}
 
 	comments = validateCommentsAgainstDiff(changes, comments)

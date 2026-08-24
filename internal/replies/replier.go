@@ -88,7 +88,7 @@ func (r *Replier) Run() error {
 
 		for _, review := range projectReviews {
 			if err := r.replyInReview(review, botUserID); err != nil {
-				r.logf("reply error in review %s: %v", review.GetBranch(), err)
+				r.logf("reply error in review %s: %v", review.GetTitle(), err)
 			}
 		}
 	}
@@ -99,7 +99,7 @@ func (r *Replier) Run() error {
 func (r *Replier) replyInReview(review *upsource.Review, botUserID string) error {
 	discussions, err := upsource.ListReviewDiscussions(r.ctx, r.upsourceClient, review)
 	if err != nil {
-		return fmt.Errorf("list discussions: %w", err)
+		return fmt.Errorf("list discussions error: %w", err)
 	}
 	if len(discussions) == 0 {
 		return nil
@@ -114,13 +114,13 @@ func (r *Replier) replyInReview(review *upsource.Review, botUserID string) error
 	}
 
 	if len(discussionsToReply) == 0 {
-		r.logf("skipping the review %s as there are no unanswered discussions and there are no mentions", review.GetTitle())
+		r.logf("skipping review as there are no unanswered discussions and there are no mentions")
 		return nil
 	}
 
 	err = r.generator.prepareReview(review)
 	if err != nil {
-		return fmt.Errorf("prepare review: %w", err)
+		return fmt.Errorf("prepare review error: %w", err)
 	}
 
 	for _, d := range discussionsToReply {
@@ -133,19 +133,19 @@ func (r *Replier) replyInReview(review *upsource.Review, botUserID string) error
 		if reply.Comment != "" {
 			last := d.Comments[len(d.Comments)-1]
 			if err := upsource.AddDiscussionComment(r.ctx, r.upsourceClient, review.GetProjectID(), d.DiscussionID, last.CommentID, reply.Comment); err != nil {
-				r.logf("failed to post reply for discussion %s: %v", d.DiscussionID, err)
+				r.logf("failed to post reply for discussion %s (review %s): %v", d.DiscussionID, review.GetTitle(), err)
 				continue
 			}
 			metrics.DefaultRecorder.RecordReplySent()
-			r.logf("posted reply in discussion %s (review %s)", d.DiscussionID, review.GetBranch())
+			r.logf("posted reply in discussion %s (review %s)", d.DiscussionID, review.GetTitle())
 		}
 
 		if reply.Close {
 			if err := upsource.ResolveDiscussion(r.ctx, r.upsourceClient, review.GetProjectID(), d.DiscussionID); err != nil {
-				r.logf("failed to resolve discussion %s: %v", d.DiscussionID, err)
+				r.logf("failed to resolve discussion %s (review %s): %v", d.DiscussionID, review.GetTitle(), err)
 				continue
 			}
-			r.logf("resolved discussion %s (review %s)", d.DiscussionID, review.GetBranch())
+			r.logf("resolved discussion %s (review %s)", d.DiscussionID, review.GetTitle())
 		}
 	}
 

@@ -55,24 +55,24 @@ func (c *commentGenerator) generate(review *upsource.Review) ([]*reviewComment, 
 
 	changes, commitsComments, err := c.gitProvider.GetReviewChanges(review)
 	if err != nil {
-		return nil, fmt.Errorf("error getting review changes for %s: %w", review.GetBranch(), err)
+		return nil, fmt.Errorf("error getting review changes: %w", err)
 	}
 
 	systemPrompt := buildSystemPrompt(c.cfg.systemMessage, c.cfg.maxPerReview)
 	userPrompt := buildUserPrompt(c.cfg.userPromptTemplate, changes, commitsComments)
 
-	log.Print("Sending prompt to LLM...")
+	log.Printf("Sending prompt to LLM for review %s...", review.GetTitle())
 
 	llmResponse, err := c.complete(userPrompt, systemPrompt)
 	if err != nil {
 		metrics.DefaultRecorder.RecordLLMError(metrics.OperationReview, c.cfg.activeProvider)
-		return nil, fmt.Errorf("LLM request failed: %w", err)
+		return nil, fmt.Errorf("request LLM failed: %w", err)
 	}
 	log.Printf("Received LLM response: %s\n", llmResponse)
 
 	comments, err := parsLLMResponse(llmResponse)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing llm response: %w", err)
 	}
 
 	comments = validateCommentsAgainstDiff(changes, comments)

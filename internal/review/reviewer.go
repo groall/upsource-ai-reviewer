@@ -82,17 +82,17 @@ func (r *Reviewer) Run() error {
 
 		for _, review := range projectReviews {
 			if comments, err = r.doReview(review); err != nil {
-				log.Printf("Error processing review %s: %v\n", review.GetReviewID(), err)
+				log.Printf("Error processing review %s: %v\n", review.GetTitle(), err)
 				continue
 			}
 
 			if len(comments) == 0 {
-				log.Printf("AI commentGenerator found no issues to comment on for %s.\n", review.GetBranch())
+				log.Printf("AI commentGenerator found no issues to comment on in %s.\n", review.GetTitle())
 				continue
 			}
 
 			if err := r.postComments(review, comments); err != nil {
-				log.Printf("Error posting comments for review %s: %v\n", review.GetReviewID(), err)
+				log.Printf("Error posting comments for review %s: %v\n", review.GetTitle(), err)
 			}
 		}
 	}
@@ -101,11 +101,11 @@ func (r *Reviewer) Run() error {
 }
 
 func (r *Reviewer) doReview(review *upsource.Review) ([]*reviewComment, error) {
-	log.Printf("Processing review %s for the branch %s.\n", review.GetReviewID(), review.GetBranch())
+	log.Printf("Processing review %s %s.\n", review.GetReviewID(), review.GetTitle())
 
 	comments, err := r.commentGenerator.generate(review)
 	if err != nil {
-		return nil, fmt.Errorf("error getting review comments for %s: %w", review.GetReviewID(), err)
+		return nil, fmt.Errorf("error generating review comments for %w", err)
 	}
 
 	if err := upsource.AddReviewLabel(r.ctx, r.upsourceClient, review, r.config.Upsource.ReviewedLabel); err != nil {
@@ -221,7 +221,7 @@ func (r *Reviewer) createDiscussionWithoutLine(comments []*reviewComment, review
 			Line:    0,
 		})
 		if err != nil {
-			return fmt.Errorf("failed to post low priority comment to review %s: %w", review.GetBranch(), err)
+			return fmt.Errorf("failed to post low priority comment: %w", err)
 		}
 		metrics.DefaultRecorder.RecordReviewCommentsPosted(len(comments))
 	}
@@ -238,7 +238,7 @@ func (r *Reviewer) createDiscussion(comment *reviewComment, review *upsource.Rev
 		Line:    comment.LineNumber,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to post low priority comment to review %s: %w", review.GetBranch(), err)
+		return fmt.Errorf("failed to post comment: %w", err)
 	}
 	metrics.DefaultRecorder.RecordReviewCommentsPosted(1)
 
