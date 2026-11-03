@@ -50,7 +50,7 @@ func (c *AgentCompletion) Run(userPrompt, systemPrompt, pathToRepo string) (stri
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("command failed: %w: %s (stdout: %s)", err, strings.TrimSpace(stderr.String()), stdout.String())
+		return stdout.String(), fmt.Errorf("command failed: %w: %s (stdout: %s)", err, strings.TrimSpace(stderr.String()), stdout.String())
 	}
 
 	output := strings.TrimSpace(stdout.String())

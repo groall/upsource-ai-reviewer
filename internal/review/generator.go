@@ -100,6 +100,13 @@ func buildSystemPrompt(systemMessage string, maxPerReview int) string {
 
 // buildUserPrompt substitutes the diff, commit messages and limit into the configured templates.
 func buildUserPrompt(userPromptTemplate, changes, commitsComments string) (userPrompt string) {
+	var locations strings.Builder
+	forEachAddedLine(changes, func(file string, line int, content string) {
+		fmt.Fprintf(&locations, "%s:%d: %s\n", file, line, content)
+	})
+	if locations.Len() > 0 {
+		changes += "\n### Added lines (repository path:new-file line: content)\n\n" + locations.String()
+	}
 	userPrompt = strings.Replace(userPromptTemplate, config.DiffsPlaceholder, changes, -1)
 	userPrompt = strings.Replace(userPrompt, config.MessagesPlaceholder, commitsComments, -1)
 

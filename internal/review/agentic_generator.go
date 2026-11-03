@@ -69,6 +69,7 @@ func (g *agenticCommentGenerator) generate(review *upsource.Review) ([]*reviewCo
 	log.Printf("Running agent in %s...", cloneDir)
 
 	llmResponse, err := g.agentRunner.Run(userPrompt, systemPrompt, cloneDir)
+	llmResponse = parseCodexJSONOutput(llmResponse)
 	output := llmResponse
 	if err != nil {
 		output = "Agent request error: " + err.Error()

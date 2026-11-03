@@ -20,6 +20,14 @@ func TestReviewDiffAddedAndDeletedHeaders(t *testing.T) {
 	}
 }
 
+func TestReviewDiffNormalizesLeadingSlashes(t *testing.T) {
+	var b strings.Builder
+	appendReviewFileDiff(&b, "/dir/file.go", "/dir/file.go", "/dir/file.go", "@@ -1 +1 @@\n-old\n+new\n")
+	if !strings.Contains(b.String(), "diff --git a/dir/file.go b/dir/file.go\n--- a/dir/file.go\n+++ b/dir/file.go\n") {
+		t.Fatalf("unexpected headers: %q", b.String())
+	}
+}
+
 func TestSplitDiffLinesPreservesFinalNewlineChange(t *testing.T) {
 	diff, err := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{A: splitDiffLines("hello"), B: splitDiffLines("hello\n"), Context: 3})
 	if err != nil {

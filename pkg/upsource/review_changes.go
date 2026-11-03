@@ -212,6 +212,12 @@ func splitDiffLines(content string) []string {
 }
 
 func writeReviewFileDiff(changes *strings.Builder, oldFileName, newFileName, diffText string) {
+	if oldFileName != "/dev/null" {
+		oldFileName = strings.TrimLeft(oldFileName, "/")
+	}
+	if newFileName != "/dev/null" {
+		newFileName = strings.TrimLeft(newFileName, "/")
+	}
 	oldHeaderName, newHeaderName := oldFileName, newFileName
 	oldPath, newPath := "a/"+oldFileName, "b/"+newFileName
 	if oldFileName == "/dev/null" {

@@ -39,9 +39,19 @@ func validateCommentsAgainstDiff(diff string, comments []*reviewComment) []*revi
 
 func buildNewFileLineIndex(diff string) map[string]map[int]bool {
 	result := make(map[string]map[int]bool)
+	forEachAddedLine(diff, func(file string, line int, _ string) {
+		if result[file] == nil {
+			result[file] = make(map[int]bool)
+		}
+		result[file][line] = true
+	})
+	return result
+}
 
+func forEachAddedLine(diff string, visit func(file string, line int, content string)) {
 	var currentFile string
 	var newLine int
+	var inHunk bool
 
 	// Hunk headers carry the starting line number for the new side of the diff.
 	hunkHeader := regexp.MustCompile(`@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@`)
@@ -52,7 +62,8 @@ func buildNewFileLineIndex(diff string) map[string]map[int]bool {
 		case strings.HasPrefix(line, "diff --git "):
 			currentFile = ""
 			newLine = 0
-		case strings.HasPrefix(line, "+++ "):
+			inHunk = false
+		case !inHunk && strings.HasPrefix(line, "+++ "):
 			path := strings.TrimSpace(strings.TrimPrefix(line, "+++ "))
 			if path == "/dev/null" {
 				currentFile = ""
@@ -67,6 +78,7 @@ func buildNewFileLineIndex(diff string) map[string]map[int]bool {
 			matches := hunkHeader.FindStringSubmatch(line)
 			if len(matches) == 2 {
 				newLine = parseInt(matches[1])
+				inHunk = true
 			}
 		default:
 			if currentFile == "" || newLine == 0 {
@@ -79,10 +91,7 @@ func buildNewFileLineIndex(diff string) map[string]map[int]bool {
 			switch line[0] {
 			case '+':
 				// Only added lines are considered safe targets for inline comments.
-				if _, ok := result[currentFile]; !ok {
-					result[currentFile] = make(map[int]bool)
-				}
-				result[currentFile][newLine] = true
+				visit(currentFile, newLine, strings.TrimSuffix(line[1:], "\r"))
 				newLine++
 			case ' ':
 				newLine++
@@ -92,15 +101,17 @@ func buildNewFileLineIndex(diff string) map[string]map[int]bool {
 		}
 	}
 
-	return result
 }
 
 // normalizeDiffPath converts unified diff paths to repository-relative paths.
 func normalizeDiffPath(path string) string {
 	path = strings.TrimSpace(path)
+	if path == "/dev/null" {
+		return path
+	}
 	path = strings.TrimPrefix(path, "a/")
 	path = strings.TrimPrefix(path, "b/")
-	return path
+	return strings.TrimLeft(path, "/")
 }
 
 func parseInt(s string) int {

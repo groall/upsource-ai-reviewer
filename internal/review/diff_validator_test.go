@@ -1,6 +1,7 @@
 package review
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -13,6 +14,8 @@ func TestNormalizeDiffPath(t *testing.T) {
 		{"b/file.go", "file.go"},
 		{"a/dir/file.go", "dir/file.go"},
 		{"b/dir/subdir/file.go", "dir/subdir/file.go"},
+		{"b//dir/file.go", "dir/file.go"},
+		{"/dir/file.go", "dir/file.go"},
 		{" a/file.go ", "file.go"},
 		{"  b/file.go  ", "file.go"},
 		{"file.go", "file.go"},
@@ -27,6 +30,23 @@ func TestNormalizeDiffPath(t *testing.T) {
 				t.Errorf("got %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestAddedLineLocationsWithHeaderLikeSource(t *testing.T) {
+	diff := "diff --git a//dir/file b//dir/file\n--- a//dir/file\n+++ b//dir/file\n@@ -1,2 +1,3 @@\n context\n+++ source\n+second\n"
+	comments := []*reviewComment{{FilePath: "dir/file", LineNumber: 2}, {FilePath: "dir/file", LineNumber: 3}}
+	validateCommentsAgainstDiff(diff, comments)
+	for _, comment := range comments {
+		if !comment.LineVerified || comment.LineNumber == 0 {
+			t.Fatalf("location rejected: %+v", comment)
+		}
+	}
+	prompt := buildUserPrompt("{{diffs}}\n{{messages}}", diff, "")
+	for _, expected := range []string{"dir/file:2: ++ source", "dir/file:3: second"} {
+		if !strings.Contains(prompt, expected) {
+			t.Errorf("missing location %q", expected)
+		}
 	}
 }
 

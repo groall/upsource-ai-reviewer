@@ -47,9 +47,9 @@ providers:
     # When the agent provider is active the review runs in fully agentic mode:
     # the review's repo is cloned at its branch and the command runs with that
     # clone as its working directory, so an agentic CLI can explore the real code.
-    # The command must read the prompt (incl. the diff) from stdin and print the
-    # JSON ReviewComment array to stdout. Requires `git` on the host.
-    command: ".codex exec" # Command that reads prompt from stdin and writes response to stdout
+    # The command reads the prompt (incl. the diff) from stdin. Use Codex --json
+    # to expose command and MCP outcomes to the metrics parser. Requires `git`.
+    command: ".codex exec --json -" # Codex JSONL events enable command and Knowledge MCP access metrics
 #    command: "HOME=/var/lib/upsource-ai-reviewer/claude-home claude -p --output-format text --permission-mode dontAsk
 #      --settings /var/lib/upsource-ai-reviewer/claude-reviewer-settings.json
 #      --mcp-config /var/lib/upsource-ai-reviewer/claude-mcp.json --strict-mcp-config

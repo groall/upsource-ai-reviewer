@@ -17,6 +17,18 @@ import (
 const (
 	OperationReview = "review"
 	OperationReply  = "reply"
+
+	// CodexCapabilityCommandExecution identifies Codex shell command execution.
+	CodexCapabilityCommandExecution = "command_execution"
+	// CodexCapabilityNodaKnowledgeMCP identifies calls to the Noda Knowledge MCP server.
+	CodexCapabilityNodaKnowledgeMCP = "noda_knowledge_mcp"
+
+	// CodexCapabilityUnknown means no attempt has been observed yet.
+	CodexCapabilityUnknown = "unknown"
+	// CodexCapabilitySuccess means the last observed attempt completed successfully.
+	CodexCapabilitySuccess = "success"
+	// CodexCapabilityFailure means the last observed attempt failed or was denied.
+	CodexCapabilityFailure = "failure"
 )
 
 type Recorder interface {
@@ -24,6 +36,7 @@ type Recorder interface {
 	RecordReplySent()
 	RecordReviewCommentsPosted(count int)
 	RecordLLMError(operation, currentProvider string)
+	RecordCodexCapability(capability, result string)
 }
 
 type prometheusRecorder struct{}
@@ -47,6 +60,14 @@ var (
 		Name: "upsource_ai_reviewer_llm_errors_total",
 		Help: "Total number of errors received from the current LLM provider.",
 	}, []string{"provider", "operation"})
+	codexCapabilityState = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "upsource_ai_reviewer_codex_capability_state",
+		Help: "Last observed Codex capability result, represented as one-hot state labels; unknown means the capability has not been observed.",
+	}, []string{"capability", "result"})
+	codexCapabilityLastChecked = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "upsource_ai_reviewer_codex_capability_last_checked_timestamp_seconds",
+		Help: "Unix timestamp of the last observed Codex capability result.",
+	}, []string{"capability"})
 )
 
 func init() {
@@ -54,6 +75,13 @@ func init() {
 		for _, operation := range []string{OperationReview, OperationReply} {
 			llmErrorsTotal.WithLabelValues(provider, operation)
 		}
+	}
+
+	for _, capability := range []string{CodexCapabilityCommandExecution, CodexCapabilityNodaKnowledgeMCP} {
+		codexCapabilityState.WithLabelValues(capability, CodexCapabilityUnknown).Set(1)
+		codexCapabilityState.WithLabelValues(capability, CodexCapabilitySuccess).Set(0)
+		codexCapabilityState.WithLabelValues(capability, CodexCapabilityFailure).Set(0)
+		codexCapabilityLastChecked.WithLabelValues(capability).Set(0)
 	}
 }
 
@@ -121,4 +149,19 @@ func (prometheusRecorder) RecordReviewCommentsPosted(count int) {
 
 func (prometheusRecorder) RecordLLMError(operation, currentProvider string) {
 	llmErrorsTotal.WithLabelValues(currentProvider, operation).Inc()
+}
+
+func (prometheusRecorder) RecordCodexCapability(capability, result string) {
+	if capability != CodexCapabilityCommandExecution && capability != CodexCapabilityNodaKnowledgeMCP {
+		return
+	}
+	if result != CodexCapabilitySuccess && result != CodexCapabilityFailure {
+		return
+	}
+
+	for _, state := range []string{CodexCapabilityUnknown, CodexCapabilitySuccess, CodexCapabilityFailure} {
+		codexCapabilityState.WithLabelValues(capability, state).Set(0)
+	}
+	codexCapabilityState.WithLabelValues(capability, result).Set(1)
+	codexCapabilityLastChecked.WithLabelValues(capability).SetToCurrentTime()
 }
