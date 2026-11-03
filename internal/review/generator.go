@@ -8,7 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/groall/upsource-ai-reviewer/internal/git"
+	"github.com/groall/upsource-go-client/client"
+
+	"github.com/groall/upsource-ai-reviewer/internal/llmlog"
 	"github.com/groall/upsource-ai-reviewer/internal/metrics"
 	"github.com/groall/upsource-ai-reviewer/pkg/config"
 	"github.com/groall/upsource-ai-reviewer/pkg/llm"
@@ -24,21 +26,22 @@ type generatorConfig struct {
 	systemMessage      string
 	maxPerReview       int
 	activeProvider     string
+	llmLogger          *llmlog.Logger
 }
 
 type commentGenerator struct {
-	llmProvider llm.Provider
-	gitProvider git.Provider
-	cfg         generatorConfig
-	ctx         context.Context
+	llmProvider    llm.Provider
+	upsourceClient *client.Client
+	cfg            generatorConfig
+	ctx            context.Context
 }
 
 // newGenerator creates a new LLM commentGenerator instance.
-func newGenerator(ctx context.Context, cfg generatorConfig, providers config.Providers, gitProvider git.Provider) (*commentGenerator, error) {
+func newGenerator(ctx context.Context, cfg generatorConfig, providers config.Providers, upsourceClient *client.Client) (*commentGenerator, error) {
 	reviewer := &commentGenerator{
-		cfg:         cfg,
-		ctx:         ctx,
-		gitProvider: gitProvider,
+		cfg:            cfg,
+		ctx:            ctx,
+		upsourceClient: upsourceClient,
 	}
 
 	var err error
@@ -52,8 +55,7 @@ func newGenerator(ctx context.Context, cfg generatorConfig, providers config.Pro
 
 // Do calls OpenAI Chat Completion API to review changes.
 func (c *commentGenerator) generate(review *upsource.Review) ([]*reviewComment, error) {
-
-	changes, commitsComments, err := c.gitProvider.GetReviewChanges(review)
+	changes, commitsComments, err := upsource.GetReviewChanges(c.ctx, c.upsourceClient, review)
 	if err != nil {
 		return nil, fmt.Errorf("error getting review changes: %w", err)
 	}
@@ -64,6 +66,13 @@ func (c *commentGenerator) generate(review *upsource.Review) ([]*reviewComment, 
 	log.Printf("Sending prompt to LLM for review %s...", review.GetTitle())
 
 	llmResponse, err := c.complete(userPrompt, systemPrompt)
+	output := llmResponse
+	if err != nil {
+		output = "LLM request error: " + err.Error()
+	}
+	if logErr := c.cfg.llmLogger.Save(review.GetReviewID().ReviewID, formatLLMInput(systemPrompt, userPrompt), output); logErr != nil {
+		log.Printf("Failed to save LLM input/output for review %s: %v", review.GetReviewID().ReviewID, logErr)
+	}
 	if err != nil {
 		metrics.DefaultRecorder.RecordLLMError(metrics.OperationReview, c.cfg.activeProvider)
 		return nil, fmt.Errorf("request LLM failed: %w", err)
@@ -78,6 +87,10 @@ func (c *commentGenerator) generate(review *upsource.Review) ([]*reviewComment, 
 	comments = validateCommentsAgainstDiff(changes, comments)
 
 	return comments, nil
+}
+
+func formatLLMInput(systemPrompt, userPrompt string) string {
+	return "System prompt:\n" + systemPrompt + "\n\nUser prompt:\n" + userPrompt
 }
 
 // buildSystemPrompt substitutes the limit into the configured templates.

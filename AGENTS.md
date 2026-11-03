@@ -78,17 +78,17 @@ providers (OpenAI/Gemini/Anthropic) keep the stateless diff-in-prompt flow.
 
 ## Configuration Overview
 
-| Section     | Key fields                                                                                                                          |
-|-------------|-------------------------------------------------------------------------------------------------------------------------------------|
-| `polling`   | `intervalSeconds`                                                                                                                   |
-| `review`    | `maxPerReview`, `activeProvider`, `systemMessageIntro`, `systemMessageGuidelines`, `systemMessageOutputFormat`, `userPromptTemplate` |
-| `upsource`  | `baseUrl`, `username`, `password`, `query`, `reviewedLabel`, `invitationLabel`                                                      |
-| `gitlab`    | `baseUrl`, `accessToken`                                                                                                            |
-| `openai`    | `apiKey`, `endpoint`, `model`, `maxTokens`, `temperature`, `requestTimeout`                                                         |
-| `gemini`    | `apiKey`, `model`, `maxTokens`                                                                                                      |
-| `anthropic` | `apiKey`, `model`, `maxTokens`, `requestTimeout`                                                                                    |
-| `agent`     | `command`, `cloneDir`, `requestTimeout`                                                                                             |
-| `replies`   | `enabled`, `maxPerThread`, `activeProvider`, `systemMessage`                                                                         |
+| Section     | Key fields                                                                      |
+|-------------|---------------------------------------------------------------------------------|
+| `polling`   | `intervalSeconds`                                                               |
+| `review`    | `maxPerReview`, `activeProvider`, `systemMessageFile`, `userPromptTemplateFile` |
+| `upsource`  | `baseUrl`, `username`, `password`, `query`, `reviewedLabel`, `invitationLabel`  |
+| `gitlab`    | `baseUrl`, `accessToken`                                                        |
+| `openai`    | `apiKey`, `endpoint`, `model`, `maxTokens`, `temperature`, `requestTimeout`     |
+| `gemini`    | `apiKey`, `model`, `maxTokens`                                                  |
+| `anthropic` | `apiKey`, `model`, `maxTokens`, `requestTimeout`                                |
+| `agent`     | `command`, `cloneDir`, `requestTimeout`                                         |
+| `replies`   | `enabled`, `maxPerThread`, `activeProvider`, `systemMessage`                    |
 
 ## Review Flow
 

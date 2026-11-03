@@ -8,6 +8,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/groall/upsource-ai-reviewer/internal/llmlog"
 	"github.com/groall/upsource-ai-reviewer/internal/metrics"
 	appConfig "github.com/groall/upsource-ai-reviewer/pkg/config"
 	"github.com/groall/upsource-ai-reviewer/pkg/llm"
@@ -30,9 +31,10 @@ type generator struct {
 	logMessages    bool
 	systemMessage  string
 	activeProvider string
+	llmLogger      *llmlog.Logger
 }
 
-func newGenerator(ctx context.Context, cfg appConfig.Replies, providersCfg appConfig.Providers) (*generator, error) {
+func newGenerator(ctx context.Context, cfg appConfig.Replies, providersCfg appConfig.Providers, llmLogger *llmlog.Logger) (*generator, error) {
 	if cfg.SystemMessage == "" {
 		return nil, fmt.Errorf("replies.systemMessage is not configured")
 	}
@@ -46,15 +48,24 @@ func newGenerator(ctx context.Context, cfg appConfig.Replies, providersCfg appCo
 		logMessages:    cfg.LogMessages,
 		systemMessage:  cfg.SystemMessage,
 		activeProvider: cfg.ActiveProvider,
+		llmLogger:      llmLogger,
 	}, nil
 }
 
-func (g *generator) reply(prefix, suffix string) (*replyResult, error) {
+func (g *generator) reply(reviewNumber, prefix, suffix string) (*replyResult, error) {
 	if g.logMessages {
 		log.Print("Sending reply prompt to LLM...")
 	}
 
 	replyText, llmErr := g.completeWithCache(prefix, suffix)
+	output := replyText
+	if llmErr != nil {
+		output = "LLM request error: " + llmErr.Error()
+	}
+	input := "System prompt:\n" + g.systemMessage + "\n\nUser prompt:\n" + prefix + suffix
+	if logErr := g.llmLogger.Save(reviewNumber, input, output); logErr != nil {
+		log.Printf("Failed to save LLM input/output for review %s: %v", reviewNumber, logErr)
+	}
 	if llmErr != nil {
 		metrics.DefaultRecorder.RecordLLMError(metrics.OperationReply, g.activeProvider)
 		return nil, fmt.Errorf("LLM reply request failed: %w", llmErr)

@@ -19,16 +19,11 @@ type Review struct {
 	ActiveProvider string `yaml:"activeProvider"`
 	MaxPerReview   int    `yaml:"maxPerReview"`
 
-	// SystemMessage is a legacy, single-block system message template for reviews.
-	// Prefer the split fields below.
-	SystemMessage string `yaml:"systemMessage"`
+	SystemMessage     string `yaml:"systemMessage"`
+	SystemMessageFile string `yaml:"systemMessageFile"`
 
-	// Split system message for reviews.
-	SystemMessageIntro        string `yaml:"systemMessageIntro"`
-	SystemMessageGuidelines   string `yaml:"systemMessageGuidelines"`
-	SystemMessageOutputFormat string `yaml:"systemMessageOutputFormat"`
-
-	UserPromptTemplate string `yaml:"userPromptTemplate"`
+	UserPromptTemplate     string `yaml:"userPromptTemplate"`
+	UserPromptTemplateFile string `yaml:"userPromptTemplateFile"`
 }
 
 // Validate validates the review configuration and required template placeholders.
@@ -46,17 +41,7 @@ func (r *Review) Validate() error {
 		return fmt.Errorf("review.activeProvider is required")
 	}
 
-	if r.usesSplitSystemMessage() {
-		if r.SystemMessageIntro == "" {
-			return fmt.Errorf("review.systemMessageIntro is required")
-		}
-		if r.SystemMessageGuidelines == "" {
-			return fmt.Errorf("review.systemMessageGuidelines is required")
-		}
-		if r.SystemMessageOutputFormat == "" {
-			return fmt.Errorf("review.systemMessageOutputFormat is required")
-		}
-	} else if r.SystemMessage == "" {
+	if r.SystemMessage == "" {
 		return fmt.Errorf("review.systemMessage is required")
 	}
 
@@ -79,20 +64,7 @@ func (r *Review) Validate() error {
 
 // SystemMessageTemplate returns the combined system message template for reviews.
 func (r *Review) SystemMessageTemplate() string {
-	if !r.usesSplitSystemMessage() {
-		return r.SystemMessage
-	}
-
-	parts := []string{
-		strings.TrimRight(r.SystemMessageIntro, "\n"),
-		strings.TrimRight(r.SystemMessageGuidelines, "\n"),
-		strings.TrimRight(r.SystemMessageOutputFormat, "\n"),
-	}
-	return strings.Join(parts, "\n\n")
-}
-
-func (r *Review) usesSplitSystemMessage() bool {
-	return r.SystemMessageIntro != "" || r.SystemMessageGuidelines != "" || r.SystemMessageOutputFormat != ""
+	return r.SystemMessage
 }
 
 func containsMaxPerReviewPlaceholder(s string) bool {

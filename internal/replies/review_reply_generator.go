@@ -1,11 +1,10 @@
 package replies
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
-	"github.com/groall/upsource-ai-reviewer/internal/git"
-	appConfig "github.com/groall/upsource-ai-reviewer/pkg/config"
 	"github.com/groall/upsource-ai-reviewer/pkg/upsource"
 	"github.com/groall/upsource-go-client/client"
 )
@@ -20,30 +19,28 @@ const replyUserPromptPrefixTemplate = `### Original code context
 `
 
 type reviewReplyGenerator struct {
-	generator   *generator
-	gitProvider git.Provider
-	review      *upsource.Review
-	codeContext string
-	botUserID   string
+	generator      *generator
+	upsourceClient *client.Client
+	ctx            context.Context
+	codeContext    string
+	botUserID      string
+	reviewNumber   string
 }
 
 func (g *reviewReplyGenerator) setBotUserID(botUserID string) {
 	g.botUserID = botUserID
 }
 
-func newReviewReplyGenerator(generator *generator, gitlabCfg *appConfig.Gitlab) (*reviewReplyGenerator, error) {
-	gitlabProvider, err := git.NewGitlabProvider(gitlabCfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create GitLab provider: %w", err)
-	}
-
+func newReviewReplyGenerator(ctx context.Context, generator *generator, upsourceClient *client.Client) *reviewReplyGenerator {
 	return &reviewReplyGenerator{
-		gitProvider: gitlabProvider,
-		generator:   generator,
-	}, nil
+		ctx:            ctx,
+		generator:      generator,
+		upsourceClient: upsourceClient,
+	}
 }
 
 func (g *reviewReplyGenerator) prepareReview(review *upsource.Review) error {
+	g.reviewNumber = review.GetReviewID().ReviewID
 	return g.loadCodeContext(review)
 }
 
@@ -60,11 +57,11 @@ func (g *reviewReplyGenerator) reply(d client.DiscussionInFileDTO) (*replyResult
 	prefix := fmt.Sprintf(replyUserPromptPrefixTemplate, g.codeContext, anchorText)
 	suffix := threadText + "\n"
 
-	return g.generator.reply(prefix, suffix)
+	return g.generator.reply(g.reviewNumber, prefix, suffix)
 }
 
 func (g *reviewReplyGenerator) loadCodeContext(review *upsource.Review) error {
-	codeContext, _, err := g.gitProvider.GetReviewChanges(review)
+	codeContext, _, err := upsource.GetReviewChanges(g.ctx, g.upsourceClient, review)
 	if err != nil {
 		return fmt.Errorf("get review changes: %w", err)
 	}

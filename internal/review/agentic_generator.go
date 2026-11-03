@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/groall/upsource-go-client/client"
+
 	"github.com/groall/upsource-ai-reviewer/internal/git"
 	"github.com/groall/upsource-ai-reviewer/internal/metrics"
 	"github.com/groall/upsource-ai-reviewer/pkg/config"
@@ -14,20 +16,22 @@ import (
 )
 
 type agenticCommentGenerator struct {
-	agentRunner *pkgllm.AgentCompletion
-	gitProvider git.RepoCloner
-	cfg         generatorConfig
-	cloneDir    string
-	ctx         context.Context
+	agentRunner    *pkgllm.AgentCompletion
+	gitProvider    git.RepoCloner
+	upsourceClient *client.Client
+	cfg            generatorConfig
+	cloneDir       string
+	ctx            context.Context
 }
 
 // newAgenticGenerator creates a new agenticCommentGenerator instance.
-func newAgenticGenerator(ctx context.Context, cfg generatorConfig, agentCfg config.Agent, gitProvider git.RepoCloner) (*agenticCommentGenerator, error) {
+func newAgenticGenerator(ctx context.Context, cfg generatorConfig, agentCfg config.Agent, gitProvider git.RepoCloner, upsourceClient *client.Client) (*agenticCommentGenerator, error) {
 	generator := &agenticCommentGenerator{
-		cfg:         cfg,
-		ctx:         ctx,
-		gitProvider: gitProvider,
-		cloneDir:    agentCfg.CloneDir,
+		cfg:            cfg,
+		ctx:            ctx,
+		gitProvider:    gitProvider,
+		upsourceClient: upsourceClient,
+		cloneDir:       agentCfg.CloneDir,
 	}
 
 	agent, err := pkgllm.NewAgentRunner(ctx, &pkgllm.AgentConfig{
@@ -48,7 +52,8 @@ func newAgenticGenerator(ctx context.Context, cfg generatorConfig, agentCfg conf
 // so the agent can explore the real code. The diff is still included in the
 // prompt for focus; the agent returns the same ReviewComment JSON.
 func (g *agenticCommentGenerator) generate(review *upsource.Review) ([]*reviewComment, error) {
-	changes, commitsComments, err := g.gitProvider.GetReviewChanges(review)
+	log.Printf("Getting review changes...")
+	changes, commitsComments, err := upsource.GetReviewChanges(g.ctx, g.upsourceClient, review)
 	if err != nil {
 		return nil, fmt.Errorf("error getting review changes: %s", err)
 	}
@@ -64,6 +69,13 @@ func (g *agenticCommentGenerator) generate(review *upsource.Review) ([]*reviewCo
 	log.Printf("Running agent in %s...", cloneDir)
 
 	llmResponse, err := g.agentRunner.Run(userPrompt, systemPrompt, cloneDir)
+	output := llmResponse
+	if err != nil {
+		output = "Agent request error: " + err.Error()
+	}
+	if logErr := g.cfg.llmLogger.Save(review.GetReviewID().ReviewID, formatLLMInput(systemPrompt, userPrompt), output); logErr != nil {
+		log.Printf("Failed to save LLM input/output for review %s: %v", review.GetReviewID().ReviewID, logErr)
+	}
 	if err != nil {
 		metrics.DefaultRecorder.RecordLLMError(metrics.OperationReview, g.cfg.activeProvider)
 		return nil, fmt.Errorf("agent request failed: %w", err)

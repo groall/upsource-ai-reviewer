@@ -3,19 +3,27 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v2"
 )
 
 // Config is the root configuration loaded from YAML.
 type Config struct {
-	Upsource  Upsource  `yaml:"upsource"`
-	Gitlab    Gitlab    `yaml:"gitlab"`
-	Review    Review    `yaml:"review"`
-	Providers Providers `yaml:"providers"`
-	Polling   Polling   `yaml:"polling"`
-	Replies   Replies   `yaml:"replies"`
-	Metrics   Metrics   `yaml:"metrics"`
+	Upsource   Upsource   `yaml:"upsource"`
+	Gitlab     Gitlab     `yaml:"gitlab"`
+	Review     Review     `yaml:"review"`
+	Providers  Providers  `yaml:"providers"`
+	Polling    Polling    `yaml:"polling"`
+	Replies    Replies    `yaml:"replies"`
+	Metrics    Metrics    `yaml:"metrics"`
+	LLMLogging LLMLogging `yaml:"llmLogging"`
+}
+
+// LLMLogging controls optional persistence of prompts and raw model responses.
+type LLMLogging struct {
+	Enabled   bool   `yaml:"enabled"`
+	Directory string `yaml:"directory"`
 }
 
 // Metrics controls the optional Prometheus metrics endpoint.
@@ -30,7 +38,7 @@ type Polling struct {
 	IntervalSeconds int `yaml:"intervalSeconds"`
 }
 
-// Gitlab contains connection details used to fetch diffs from GitLab.
+// Gitlab contains credentials used to clone repositories for agentic reviews.
 type Gitlab struct {
 	BaseURL     string `yaml:"baseUrl"`
 	AccessToken string `yaml:"accessToken"`
@@ -50,8 +58,46 @@ func LoadConfig(filename string) (*Config, error) {
 	if err = yaml.Unmarshal(data, config); err != nil {
 		return nil, fmt.Errorf("failed to parse config YAML: %w", err)
 	}
+	if err = config.loadPromptFiles(filepath.Dir(filename)); err != nil {
+		return nil, err
+	}
 
 	return config, nil
+}
+
+func (c *Config) loadPromptFiles(configDir string) error {
+	load := func(name, path string) (string, error) {
+		if path == "" {
+			return "", nil
+		}
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(configDir, path)
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return "", fmt.Errorf("failed to read %s prompt file %q: %w", name, path, err)
+		}
+		return string(content), nil
+	}
+
+	for _, prompt := range []struct {
+		name   string
+		path   string
+		target *string
+	}{
+		{"review.systemMessage", c.Review.SystemMessageFile, &c.Review.SystemMessage},
+		{"review.userPromptTemplate", c.Review.UserPromptTemplateFile, &c.Review.UserPromptTemplate},
+		{"replies.systemMessage", c.Replies.SystemMessageFile, &c.Replies.SystemMessage},
+	} {
+		content, err := load(prompt.name, prompt.path)
+		if err != nil {
+			return err
+		}
+		if prompt.path != "" {
+			*prompt.target = content
+		}
+	}
+	return nil
 }
 
 // ValidateConfig validates configuration values and applies defaults in-place.
@@ -64,14 +110,6 @@ func ValidateConfig(config *Config) error {
 		return fmt.Errorf("upsource config is invalid: %w", err)
 	}
 
-	if config.Gitlab.BaseURL == "" {
-		return fmt.Errorf("gitlab.baseUrl is required")
-	}
-
-	if config.Gitlab.AccessToken == "" {
-		return fmt.Errorf("gitlab.accessToken is required")
-	}
-
 	if config.Polling.IntervalSeconds == 0 {
 		return fmt.Errorf("polling.intervalSeconds is required")
 	}
@@ -79,6 +117,20 @@ func ValidateConfig(config *Config) error {
 	if err := config.Review.Validate(); err != nil {
 		return fmt.Errorf("review config is invalid: %w", err)
 	}
+
+	if config.LLMLogging.Enabled && config.LLMLogging.Directory == "" {
+		return fmt.Errorf("llmLogging.directory is required when llmLogging.enabled is true")
+	}
+
+	if config.Review.ActiveProvider == ProviderAgent {
+		if config.Gitlab.BaseURL == "" {
+			return fmt.Errorf("gitlab.baseUrl is required for agent repository cloning")
+		}
+		if config.Gitlab.AccessToken == "" {
+			return fmt.Errorf("gitlab.accessToken is required for agent repository cloning")
+		}
+	}
+
 	if err := config.Replies.Validate(); err != nil {
 		return fmt.Errorf("replies config is invalid: %w", err)
 	}

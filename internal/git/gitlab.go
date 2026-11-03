@@ -10,70 +10,21 @@ import (
 	"path/filepath"
 	"strings"
 
-	gitlab "gitlab.com/gitlab-org/api/client-go"
-
 	"github.com/groall/upsource-ai-reviewer/pkg/config"
 )
 
-// GitlabProvider implements the Provider interface for GitLab.
+// GitlabProvider clones GitLab repositories for agentic review.
 type GitlabProvider struct {
-	gitlabClient *gitlab.Client
-	baseURL      string
-	accessToken  string
+	baseURL     string
+	accessToken string
 }
 
 // NewGitlabProvider creates a new GitlabProvider instance.
 func NewGitlabProvider(cfg *config.Gitlab) (*GitlabProvider, error) {
-	gitlabClient, err := gitlab.NewClient(cfg.AccessToken, gitlab.WithBaseURL(cfg.BaseURL))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create GitLab client: %w", err)
-	}
-
 	return &GitlabProvider{
-		gitlabClient: gitlabClient,
-		baseURL:      cfg.BaseURL,
-		accessToken:  cfg.AccessToken,
+		baseURL:     cfg.BaseURL,
+		accessToken: cfg.AccessToken,
 	}, nil
-}
-
-// GetReviewChanges fetches the changes between the default branch and the review branch.
-func (g *GitlabProvider) GetReviewChanges(review Review) (string, string, error) {
-	fmt.Printf("Fetching changes between branch '%s' and '%s'\n", review.GetDefaultBranch(), review.GetBranch())
-
-	branch := review.GetBranch()
-	compareOpts := &gitlab.CompareOptions{
-		To: &branch,
-	}
-	namespace, repoName := review.GetGitNamespaceAndName()
-	gitlabProjectID := fmt.Sprintf("%s/%s", namespace, repoName)
-
-	branches, _, err := g.gitlabClient.Branches.ListBranches(gitlabProjectID, &gitlab.ListBranchesOptions{})
-	if err != nil {
-		return "", "", fmt.Errorf("failed to list branches for project %s: %w", gitlabProjectID, err)
-	}
-
-	var defaultBranch string
-	for _, b := range branches {
-		if b.Default {
-			defaultBranch = b.Name
-			break
-		}
-	}
-	if defaultBranch == "" {
-		defaultBranch = review.GetDefaultBranch()
-	}
-	compareOpts.From = &defaultBranch
-
-	comparison, _, err := g.gitlabClient.Repositories.Compare(gitlabProjectID, compareOpts)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to compare branches for review %s: %w", review.GetBranch(), err)
-	}
-
-	if len(comparison.Diffs) == 0 {
-		return "", "", fmt.Errorf("no diffs found between '%s' and '%s'", review.GetDefaultBranch(), review.GetBranch())
-	}
-
-	return createChangesText(comparison.Diffs), createCommitsCommentsText(comparison.Commits), nil
 }
 
 // PrepareReviewRepo ensures the review's repository is available under baseDir
@@ -89,7 +40,6 @@ func (g *GitlabProvider) PrepareReviewRepo(review Review, baseDir string) (strin
 	namespace, repoName := review.GetGitNamespaceAndName()
 	branch := review.GetBranch()
 	cloneURL := buildCloneURL(host, g.accessToken, namespace, repoName)
-	redactedURL := redactCloneURL(host, namespace, repoName)
 
 	repoDir := filepath.Join(baseDir, namespace, repoName)
 
@@ -99,9 +49,6 @@ func (g *GitlabProvider) PrepareReviewRepo(review Review, baseDir string) (strin
 	}
 
 	args := []string{"clone", "--single-branch", "--branch", branch, cloneURL, repoDir}
-	log.Printf("Cloning %s/%s (branch %s): git %s",
-		namespace, repoName, branch,
-		strings.Replace(strings.Join(args, " "), cloneURL, redactedURL, 1))
 
 	if err := os.MkdirAll(filepath.Dir(repoDir), 0o755); err != nil {
 		return "", fmt.Errorf("failed to create clone parent directory: %w", err)
@@ -118,8 +65,19 @@ func (g *GitlabProvider) PrepareReviewRepo(review Review, baseDir string) (strin
 // URL (the access token may have rotated), fetches the branch and resets the
 // working tree to match origin.
 func (g *GitlabProvider) updateRepo(repoDir, cloneURL, branch string) error {
-	if out, err := runGit(repoDir, "remote", "set-url", "origin", cloneURL); err != nil {
-		return fmt.Errorf("git remote set-url failed: %w: %s", err, out)
+	remotes, err := runGit(repoDir, "remote")
+	if err != nil {
+		return fmt.Errorf("git remote failed: %w: %s", err, remotes)
+	}
+	remoteArgs := []string{"remote", "add", "origin", cloneURL}
+	for _, remote := range strings.Fields(remotes) {
+		if remote == "origin" {
+			remoteArgs[1] = "set-url"
+			break
+		}
+	}
+	if out, err := runGit(repoDir, remoteArgs...); err != nil {
+		return fmt.Errorf("git remote %s failed: %w: %s", remoteArgs[1], err, out)
 	}
 	refspec := fmt.Sprintf("+refs/heads/%s:refs/remotes/origin/%s", branch, branch)
 	if out, err := runGit(repoDir, "fetch", "--prune", "origin", refspec); err != nil {
@@ -147,10 +105,24 @@ func isGitRepo(dir string) bool {
 // runGit runs a git command in dir (or the current directory when empty) and
 // returns its combined, trimmed output.
 func runGit(dir string, args ...string) (string, error) {
+	log.Printf("Executing command: git %s", strings.Join(redactGitArgs(args), " "))
 	cmd := exec.CommandContext(context.Background(), "git", args...)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	return strings.TrimSpace(string(out)), err
+}
+
+func redactGitArgs(args []string) []string {
+	redacted := make([]string, len(args))
+	for i, arg := range args {
+		redacted[i] = arg
+		u, err := url.Parse(arg)
+		if err == nil && u.User != nil {
+			u.User = url.UserPassword(u.User.Username(), "***")
+			redacted[i] = u.String()
+		}
+	}
+	return redacted
 }
 
 // cloneHost extracts scheme+host from the GitLab API base URL, dropping any API path.
@@ -175,34 +147,4 @@ func buildCloneURL(host, token, namespace, repoName string) string {
 // redactCloneURL builds the same clone URL with the token masked, for logging.
 func redactCloneURL(host, namespace, repoName string) string {
 	return buildCloneURL(host, "***", namespace, repoName)
-}
-
-// createChangesText constructs the changes text from the GitLab comparison diffs.
-func createChangesText(diffs []*gitlab.Diff) string {
-	var changesBuilder strings.Builder
-	for _, diff := range diffs {
-		if diff.NewFile {
-			changesBuilder.WriteString(fmt.Sprintf("--- /dev/null\n+++ b/%s\n", diff.NewPath))
-		} else if diff.DeletedFile {
-			changesBuilder.WriteString(fmt.Sprintf("--- a/%s\n+++ /dev/null\n", diff.OldPath))
-		} else if diff.RenamedFile {
-			changesBuilder.WriteString(fmt.Sprintf("--- a/%s\n+++ b/%s\n", diff.OldPath, diff.NewPath))
-		} else {
-			changesBuilder.WriteString(fmt.Sprintf("--- a/%s\n+++ b/%s\n", diff.OldPath, diff.NewPath))
-		}
-		changesBuilder.WriteString(diff.Diff)
-		changesBuilder.WriteString("\n\n")
-	}
-
-	return changesBuilder.String()
-}
-
-// createCommitsCommentsText constructs the comments text from the GitLab comparison commits.
-func createCommitsCommentsText(commits []*gitlab.Commit) string {
-	var commentsBuilder strings.Builder
-	for _, comment := range commits {
-		commentsBuilder.WriteString(fmt.Sprintf("Commit %s:\n%s\n\n", comment.ID, comment.Message))
-	}
-
-	return commentsBuilder.String()
 }

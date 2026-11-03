@@ -6,6 +6,7 @@ import (
 	"log"
 	"sort"
 
+	"github.com/groall/upsource-ai-reviewer/internal/llmlog"
 	"github.com/groall/upsource-ai-reviewer/internal/metrics"
 	appConfig "github.com/groall/upsource-ai-reviewer/pkg/config"
 	"github.com/groall/upsource-go-client/client"
@@ -35,14 +36,11 @@ func NewReplier(ctx context.Context, appConfig *appConfig.Config) (*Replier, err
 		return nil, fmt.Errorf("failed to create Upsource client: %w", err)
 	}
 
-	repliesGenerator, err := newGenerator(ctx, appConfig.Replies, appConfig.Providers)
+	repliesGenerator, err := newGenerator(ctx, appConfig.Replies, appConfig.Providers, llmlog.New(appConfig.LLMLogging.Enabled, appConfig.LLMLogging.Directory))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Replier generator: %w", err)
 	}
-	reviewReplyGenerator, err := newReviewReplyGenerator(repliesGenerator, &appConfig.Gitlab)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create ReviewReplyGenerator: %w", err)
-	}
+	reviewReplyGenerator := newReviewReplyGenerator(ctx, repliesGenerator, upsourceClient)
 
 	config := &config{
 		reviewedLabel:      appConfig.Upsource.ReviewedLabel,

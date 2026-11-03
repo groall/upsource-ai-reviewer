@@ -10,6 +10,7 @@ import (
 	"github.com/groall/upsource-go-client/client"
 
 	"github.com/groall/upsource-ai-reviewer/internal/git"
+	"github.com/groall/upsource-ai-reviewer/internal/llmlog"
 	"github.com/groall/upsource-ai-reviewer/internal/metrics"
 	"github.com/groall/upsource-ai-reviewer/pkg/config"
 	"github.com/groall/upsource-ai-reviewer/pkg/upsource"
@@ -30,26 +31,26 @@ func NewReviewer(ctx context.Context, appConfig *config.Config) (*Reviewer, erro
 		return nil, fmt.Errorf("failed to create Upsource client: %w", err)
 	}
 
-	gitlabProvider, err := git.NewGitlabProvider(&appConfig.Gitlab)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create GitLab provider: %w", err)
-	}
-
 	generatorCfg := generatorConfig{
 		userPromptTemplate: appConfig.Review.UserPromptTemplate,
 		systemMessage:      appConfig.Review.SystemMessageTemplate(),
 		maxPerReview:       appConfig.Review.MaxPerReview,
 		activeProvider:     appConfig.Review.ActiveProvider,
+		llmLogger:          llmlog.New(appConfig.LLMLogging.Enabled, appConfig.LLMLogging.Directory),
 	}
 
 	var cmtGenerator iCommentGenerator
 	if appConfig.Review.ActiveProvider == config.ProviderAgent {
-		cmtGenerator, err = newAgenticGenerator(ctx, generatorCfg, appConfig.Providers.Agent, gitlabProvider)
+		gitlabProvider, providerErr := git.NewGitlabProvider(&appConfig.Gitlab)
+		if providerErr != nil {
+			return nil, fmt.Errorf("failed to create GitLab provider for agent clone: %w", providerErr)
+		}
+		cmtGenerator, err = newAgenticGenerator(ctx, generatorCfg, appConfig.Providers.Agent, gitlabProvider, upsourceClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create agentic LLM reviewer: %w", err)
 		}
 	} else {
-		cmtGenerator, err = newGenerator(ctx, generatorCfg, appConfig.Providers, gitlabProvider)
+		cmtGenerator, err = newGenerator(ctx, generatorCfg, appConfig.Providers, upsourceClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create LLM reviewer: %w", err)
 		}

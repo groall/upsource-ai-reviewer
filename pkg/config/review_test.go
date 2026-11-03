@@ -18,15 +18,15 @@ func TestReviewValidate(t *testing.T) {
 		require.EqualError(t, r.Validate(), "review.maxPerReview is required")
 	})
 
-	t.Run("fails when system message intro is missing", func(t *testing.T) {
+	t.Run("fails when system message is missing", func(t *testing.T) {
 		r := validReview()
-		r.SystemMessageIntro = ""
-		require.EqualError(t, r.Validate(), "review.systemMessageIntro is required")
+		r.SystemMessage = ""
+		require.EqualError(t, r.Validate(), "review.systemMessage is required")
 	})
 
 	t.Run("fails when system message template is invalid", func(t *testing.T) {
 		r := validReview()
-		r.SystemMessageGuidelines = "max 10"
+		r.SystemMessage = "system message without placeholder"
 		require.EqualError(t, r.Validate(), "review.systemMessage is not a valid template (expected maxPerReview placeholder like {{max_per_review}})")
 	})
 
@@ -73,7 +73,7 @@ func TestReviewValidate(t *testing.T) {
 		require.NoError(t, r.Validate())
 	})
 
-	t.Run("supports legacy single systemMessage", func(t *testing.T) {
+	t.Run("supports single systemMessage", func(t *testing.T) {
 		r := &Review{
 			ActiveProvider:     ProviderOpenAI,
 			MaxPerReview:       5,
@@ -83,15 +83,9 @@ func TestReviewValidate(t *testing.T) {
 		require.NoError(t, r.Validate())
 	})
 
-	t.Run("fails when systemMessageOutputFormat is missing in split mode", func(t *testing.T) {
-		r := validReview()
-		r.SystemMessageOutputFormat = ""
-		require.EqualError(t, r.Validate(), "review.systemMessageOutputFormat is required")
-	})
-
 	t.Run("fails when system message lacks maxPerReview placeholder", func(t *testing.T) {
 		r := validReview()
-		r.SystemMessageGuidelines = "guidelines without placeholder"
+		r.SystemMessage = "guidelines without placeholder"
 		require.EqualError(t, r.Validate(), "review.systemMessage is not a valid template (expected maxPerReview placeholder like {{max_per_review}})")
 	})
 
@@ -116,11 +110,9 @@ func TestReviewValidate(t *testing.T) {
 
 func validReview() *Review {
 	return &Review{
-		ActiveProvider:            ProviderOpenAI,
-		MaxPerReview:              10,
-		SystemMessageIntro:        "intro",
-		SystemMessageGuidelines:   "max {{max_per_review}}",
-		SystemMessageOutputFormat: "output",
-		UserPromptTemplate:        "diffs: {{diffs}}\nmessages: {{messages}}",
+		ActiveProvider:     ProviderOpenAI,
+		MaxPerReview:       10,
+		SystemMessage:      "intro\n\nmax {{max_per_review}}\n\noutput",
+		UserPromptTemplate: "diffs: {{diffs}}\nmessages: {{messages}}",
 	}
 }

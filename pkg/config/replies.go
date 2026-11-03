@@ -4,11 +4,12 @@ import "fmt"
 
 // Replies controls follow-up replies posted to existing Upsource discussions.
 type Replies struct {
-	ActiveProvider string `yaml:"activeProvider"`
-	Enabled        bool   `yaml:"enabled"`
-	LogMessages    bool   `yaml:"logMessages"`
-	MaxPerThread   int    `yaml:"maxPerThread"`
-	SystemMessage  string `yaml:"systemMessage"`
+	ActiveProvider    string `yaml:"activeProvider"`
+	Enabled           bool   `yaml:"enabled"`
+	LogMessages       bool   `yaml:"logMessages"`
+	MaxPerThread      int    `yaml:"maxPerThread"`
+	SystemMessage     string `yaml:"systemMessage"`
+	SystemMessageFile string `yaml:"systemMessageFile"`
 }
 
 // Validate validates the reply configuration when replies are enabled.

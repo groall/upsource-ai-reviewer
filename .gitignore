@@ -11,3 +11,5 @@ vendor/
 /.agents/
 /repos/
 /opencode.json
+/prompts/
+/tmp.md

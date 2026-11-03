@@ -25,9 +25,7 @@ gitlab:
 review:
   maxPerReview: 10
   postInLine: high
-  systemMessageIntro: "intro"
-  systemMessageGuidelines: "max {{max_per_review}}"
-  systemMessageOutputFormat: "output"
+  systemMessage: "intro\n\nmax {{max_per_review}}\n\noutput"
   userPromptTemplate: "diffs: {{diffs}}\nmessages: {{messages}}"
 replies:
   logMessages: true
@@ -96,22 +94,26 @@ func TestValidateConfig(t *testing.T) {
 		require.EqualError(t, err, "providers config is invalid: providers.openai.model is required when openai provider is active")
 	})
 
-	t.Run("fails when gitlab base url is missing", func(t *testing.T) {
+	t.Run("requires GitLab settings for agent repository cloning", func(t *testing.T) {
 		cfg := validConfig()
+		cfg.Review.ActiveProvider = ProviderAgent
+		cfg.Providers = Providers{Agent: Agent{Command: "codex"}}
 		cfg.Gitlab.BaseURL = ""
 
 		err := ValidateConfig(cfg)
 
-		require.EqualError(t, err, "gitlab.baseUrl is required")
+		require.EqualError(t, err, "gitlab.baseUrl is required for agent repository cloning")
 	})
 
-	t.Run("fails when gitlab access token is missing", func(t *testing.T) {
+	t.Run("requires GitLab token for agent repository cloning", func(t *testing.T) {
 		cfg := validConfig()
+		cfg.Review.ActiveProvider = ProviderAgent
+		cfg.Providers = Providers{Agent: Agent{Command: "codex"}}
 		cfg.Gitlab.AccessToken = ""
 
 		err := ValidateConfig(cfg)
 
-		require.EqualError(t, err, "gitlab.accessToken is required")
+		require.EqualError(t, err, "gitlab.accessToken is required for agent repository cloning")
 	})
 
 	t.Run("fails when polling interval is missing", func(t *testing.T) {
@@ -319,12 +321,10 @@ func validConfig() *Config {
 			AccessToken: "token",
 		},
 		Review: Review{
-			ActiveProvider:            ProviderOpenAI,
-			MaxPerReview:              10,
-			SystemMessageIntro:        "intro",
-			SystemMessageGuidelines:   "max {{max_per_review}}",
-			SystemMessageOutputFormat: "output",
-			UserPromptTemplate:        "diffs: {{diffs}}\nmessages: {{messages}}",
+			ActiveProvider:     ProviderOpenAI,
+			MaxPerReview:       10,
+			SystemMessage:      "intro\n\nmax {{max_per_review}}\n\noutput",
+			UserPromptTemplate: "diffs: {{diffs}}\nmessages: {{messages}}",
 		},
 		Providers: Providers{
 			OpenAI: OpenAI{
