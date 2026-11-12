@@ -86,6 +86,7 @@ func (g *generator) reply(reviewNumber, prefix, suffix string) (*replyResult, er
 }
 
 func (g *generator) complete(userPrompt string) (string, error) {
+	metrics.DefaultRecorder.RecordLLMRequest(metrics.OperationReply, g.activeProvider)
 	return g.llmProvider.Completion(userPrompt, g.systemMessage)
 }
 
@@ -99,6 +100,7 @@ func (g *generator) completeWithCache(prefix, suffix string) (string, error) {
 		return g.complete(prefix + suffix)
 	}
 
+	metrics.DefaultRecorder.RecordLLMRequest(metrics.OperationReply, g.activeProvider)
 	replyText, llmErr := p.CompletionWithPrefixCache(prefix, suffix, g.systemMessage)
 	if llmErr != nil {
 		if g.logMessages {

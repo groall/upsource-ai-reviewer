@@ -41,6 +41,20 @@ func TestRecordLLMError(t *testing.T) {
 	require.Equal(t, replyErrorsBefore+1, counterValue(t, replyErrors))
 }
 
+func TestRecordLLMRequest(t *testing.T) {
+	reviewRequests := llmRequestsTotal.WithLabelValues("agent", OperationReview)
+	replyRequests := llmRequestsTotal.WithLabelValues("openai", OperationReply)
+
+	reviewRequestsBefore := counterValue(t, reviewRequests)
+	replyRequestsBefore := counterValue(t, replyRequests)
+
+	DefaultRecorder.RecordLLMRequest(OperationReview, "agent")
+	DefaultRecorder.RecordLLMRequest(OperationReply, "openai")
+
+	require.Equal(t, reviewRequestsBefore+1, counterValue(t, reviewRequests))
+	require.Equal(t, replyRequestsBefore+1, counterValue(t, replyRequests))
+}
+
 func counterValue(t *testing.T, metric prometheus.Metric) float64 {
 	t.Helper()
 

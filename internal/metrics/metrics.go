@@ -35,6 +35,7 @@ type Recorder interface {
 	RecordReviewReviewed()
 	RecordReplySent()
 	RecordReviewCommentsPosted(count int)
+	RecordLLMRequest(operation, currentProvider string)
 	RecordLLMError(operation, currentProvider string)
 	RecordCodexCapability(capability, result string)
 }
@@ -59,6 +60,10 @@ var (
 	llmErrorsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "upsource_ai_reviewer_llm_errors_total",
 		Help: "Total number of errors received from the current LLM provider.",
+	}, []string{"provider", "operation"})
+	llmRequestsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "upsource_ai_reviewer_llm_requests_total",
+		Help: "Total number of requests sent to the current LLM provider.",
 	}, []string{"provider", "operation"})
 	codexCapabilityState = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "upsource_ai_reviewer_codex_capability_state",
@@ -149,6 +154,10 @@ func (prometheusRecorder) RecordReviewCommentsPosted(count int) {
 
 func (prometheusRecorder) RecordLLMError(operation, currentProvider string) {
 	llmErrorsTotal.WithLabelValues(currentProvider, operation).Inc()
+}
+
+func (prometheusRecorder) RecordLLMRequest(operation, currentProvider string) {
+	llmRequestsTotal.WithLabelValues(currentProvider, operation).Inc()
 }
 
 func (prometheusRecorder) RecordCodexCapability(capability, result string) {

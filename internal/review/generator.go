@@ -114,6 +114,7 @@ func buildUserPrompt(userPromptTemplate, changes, commitsComments string) (userP
 }
 
 func (c *commentGenerator) complete(userPrompt, systemPrompt string) (string, error) {
+	metrics.DefaultRecorder.RecordLLMRequest(metrics.OperationReview, c.cfg.activeProvider)
 	return c.llmProvider.Completion(userPrompt, systemPrompt)
 }
 

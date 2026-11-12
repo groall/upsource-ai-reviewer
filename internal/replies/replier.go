@@ -122,6 +122,7 @@ func (r *Replier) replyInReview(review *upsource.Review, botUserID string) error
 	}
 
 	for _, d := range discussionsToReply {
+		r.logf("generate reply in review %s", review.GetTitle())
 		reply, lerr := r.generator.reply(d)
 		if lerr != nil {
 			r.logf("failed to get reply for discussion %s: %v", d.DiscussionID, lerr)

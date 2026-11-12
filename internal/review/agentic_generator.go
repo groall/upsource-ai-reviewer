@@ -68,6 +68,7 @@ func (g *agenticCommentGenerator) generate(review *upsource.Review) ([]*reviewCo
 
 	log.Printf("Running agent in %s...", cloneDir)
 
+	metrics.DefaultRecorder.RecordLLMRequest(metrics.OperationReview, g.cfg.activeProvider)
 	llmResponse, err := g.agentRunner.Run(userPrompt, systemPrompt, cloneDir)
 	llmResponse = parseCodexJSONOutput(llmResponse)
 	output := llmResponse
