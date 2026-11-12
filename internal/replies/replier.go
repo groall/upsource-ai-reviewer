@@ -145,6 +145,12 @@ func (r *Replier) replyInReview(review *upsource.Review, botUserID string) error
 				continue
 			}
 			r.logf("resolved discussion %s (review %s)", d.DiscussionID, review.GetTitle())
+		} else if reply.Comment == "" {
+			if err := upsource.ResolveDiscussion(r.ctx, r.upsourceClient, review.GetProjectID(), d.DiscussionID); err != nil {
+				r.logf("failed to resolve discussion %s (review %s): %v", d.DiscussionID, review.GetTitle(), err)
+				continue
+			}
+			r.logf("got empty response and resolved discussion %s (review %s)", d.DiscussionID, review.GetTitle())
 		}
 	}
 
